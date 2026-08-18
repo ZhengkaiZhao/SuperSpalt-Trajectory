@@ -7,7 +7,7 @@
 | 项目 | 版本 | 含义 |
 | --- | --- | --- |
 | 最低支持 | Node.js 22.0.0 | `package.json` 的 `engines` 下限，低于此版本拒绝构建 |
-| 推荐测试 | Node.js 24.19.0 LTS | `.nvmrc` 与 `.node-version` 固定版本 |
+| 推荐目标 | Node.js 24.19.0 LTS | `.nvmrc` 与 `.node-version` 固定版本 |
 | npm | 随 Node.js 安装 | 启动器优先调用当前 Node 安装目录内配套的 npm |
 
 Node.js 20 已结束生命周期，因此不再作为项目最低版本。Node.js 22 和 24 均由 CI 构建；完整质量检查在 Node.js 24 上执行。

@@ -59,7 +59,7 @@ if (-not $belowRecommended) {
 $reason = if ($belowMinimum) {
     'Node.js is missing or unsupported and must be installed/upgraded.'
 } else {
-    'Node.js is supported, but a newer project-tested LTS patch is available.'
+    'Node.js is supported, but a newer project-recommended LTS patch is available.'
 }
 Write-Host "[Node] Status    : $reason" -ForegroundColor Yellow
 

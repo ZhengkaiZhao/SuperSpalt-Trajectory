@@ -6,7 +6,7 @@ For the complete Chinese workflow, see `docs/USER_GUIDE.zh-CN.md`.
 
 ## Run on Windows
 
-1. Install Node.js 22 or newer. Node.js 24.19.0 LTS is recommended and tested.
+1. Install Node.js 22 or newer. Node.js 24.19.0 LTS is the recommended project target.
 2. Double-click `start-windows.cmd`.
 3. Keep the command window open while using SuperSplat.
 
@@ -14,7 +14,7 @@ NVIDIA users can double-click `SuperSplat RTX.cmd` to launch an isolated Chrome 
 
 ## Run on macOS
 
-1. Install Node.js 22 or newer. Node.js 24.19.0 LTS is recommended and tested.
+1. Install Node.js 22 or newer. Node.js 24.19.0 LTS is the recommended project target.
 2. Double-click `start-macos.command`.
 3. If macOS blocks the first launch, right-click the file and choose Open.
 4. Keep Terminal open while using SuperSplat.

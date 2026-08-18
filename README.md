@@ -4,7 +4,7 @@
 
 ## Windows 启动
 
-环境要求：Windows 10/11、Node.js 22+ 和支持 WebGPU 的 Chrome 或 Edge。推荐使用项目测试版本 Node.js 24.19.0 LTS；双击启动器会先检查版本，并在需要时询问是否通过 `winget` 安装或升级。
+环境要求：Windows 10/11、Node.js 22+ 和支持 WebGPU 的 Chrome 或 Edge。项目推荐目标版本为 Node.js 24.19.0 LTS；双击启动器会先检查版本，并在需要时询问是否通过 `winget` 安装或升级。
 
 1. 双击 [`start-windows.cmd`](start-windows.cmd)。
 2. 脚本会检查 Node/npm、依赖锁文件、源码校验缓存与构建状态，再按需执行 `npm ci`、完整检查和构建。

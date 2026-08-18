@@ -6,7 +6,7 @@
 
 ### 1.1 必要环境
 
-- Node.js 22.0 或更高版本；推荐并测试 Node.js 24.19.0 LTS。
+- Node.js 22.0 或更高版本；项目推荐目标为 Node.js 24.19.0 LTS。
 - 支持 WebGPU 的新版 Google Chrome 或 Microsoft Edge。
 - NVIDIA RTX 并非必需，但大规模高斯模型建议使用独立显卡。
 
