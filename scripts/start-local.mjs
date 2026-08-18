@@ -1,74 +1,245 @@
-import { spawn } from 'node:child_process';
-import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import {
+    createReadStream,
+    existsSync,
+    readFileSync,
+    readdirSync,
+    statSync,
+    writeFileSync
+} from 'node:fs';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distRoot = path.join(projectRoot, 'dist');
+const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+const packageLock = JSON.parse(readFileSync(path.join(projectRoot, 'package-lock.json'), 'utf8'));
+const recommendedNodeVersion = readFileSync(path.join(projectRoot, '.nvmrc'), 'utf8').trim();
 const requestedPort = Number.parseInt(
     process.argv.find(argument => argument.startsWith('--port='))?.split('=')[1] ?? '3011',
     10
 );
-const rebuild = process.argv.includes('--rebuild');
+const rebuild = process.argv.includes('--rebuild') || process.argv.includes('--repair');
+const repair = process.argv.includes('--repair');
+const forceInstall = process.argv.includes('--install') || repair;
+const forceCheck = process.argv.includes('--check') || repair;
+const skipCheck = process.argv.includes('--no-check');
+const setupOnly = process.argv.includes('--setup-only');
 const strictPort = process.argv.includes('--strict-port');
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
-const minimumNodeVersion = [20, 19, 0];
+const nodeDirectory = path.dirname(process.execPath);
+process.env.PATH = `${nodeDirectory}${path.delimiter}${process.env.PATH ?? ''}`;
+const bundledNpm = path.join(nodeDirectory, process.platform === 'win32' ? 'npm.cmd' : 'npm');
+const npmCommand = existsSync(bundledNpm) ? bundledNpm : process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npmCli = [
+    path.join(nodeDirectory, 'node_modules/npm/bin/npm-cli.js'),
+    path.resolve(nodeDirectory, '../lib/node_modules/npm/bin/npm-cli.js')
+].find(existsSync);
+const npmRunner = npmCli ? {
+    command: process.execPath,
+    prefix: [npmCli],
+    shell: false
+} : {
+    command: npmCommand,
+    prefix: [],
+    shell: process.platform === 'win32'
+};
+const minimumNodeVersion = [22, 0, 0];
+
+const printHelp = () => {
+    console.log(`SuperSpalt Trajectory local launcher
+
+Usage:
+  node scripts/start-local.mjs [options]
+
+Options:
+  --port=<1024-65535>  Preferred port (default: 3011; tries 19 more ports)
+  --strict-port        Fail instead of selecting the next available port
+  --no-open            Start the server without opening a browser
+  --install            Reinstall exactly from package-lock.json with npm ci
+  --check              Force all project validation checks
+  --no-check           Skip project validation for this launch
+  --rebuild            Force a new dist build
+  --repair             Force install, validation, and rebuild
+  --setup-only         Prepare and validate without starting the server
+  --help               Show this help
+
+The default launch installs only when dependencies are missing/stale, validates
+changed source, builds changed source, and reuses successful validation results.`);
+};
+
+if (process.argv.includes('--help')) {
+    printHelp();
+    process.exit(0);
+}
+
+const compareVersions = (left, right) => {
+    for (let index = 0; index < Math.max(left.length, right.length); index++) {
+        const difference = (left[index] ?? 0) - (right[index] ?? 0);
+        if (difference !== 0) return Math.sign(difference);
+    }
+    return 0;
+};
+
 const nodeVersion = process.versions.node.split('.').map(Number);
-const nodeVersionSupported = minimumNodeVersion.every((value, index) => (
-    nodeVersion[index] === value ? true : nodeVersion[index] > value ? true :
-        nodeVersion.slice(0, index).some((part, partIndex) => part > minimumNodeVersion[partIndex])
-));
-if (!nodeVersionSupported) {
-    throw new Error(`Node.js 20.19 or newer is required; current version is ${process.versions.node}`);
+const startupProblems = [];
+if (compareVersions(nodeVersion, minimumNodeVersion) < 0) {
+    startupProblems.push(`Node.js 22 or newer is required; current version is ${process.versions.node}`);
 }
 if (!Number.isSafeInteger(requestedPort) || requestedPort < 1024 || requestedPort > 65535) {
-    throw new Error(`Invalid local port: ${requestedPort}`);
+    startupProblems.push(`invalid local port: ${requestedPort}`);
 }
+if (skipCheck && forceCheck) startupProblems.push('--check/--repair cannot be combined with --no-check');
 
-const run = (command, args) => new Promise((resolve, reject) => {
+const latestModified = (pathname) => {
+    if (!existsSync(pathname)) return 0;
+    const stat = statSync(pathname);
+    if (!stat.isDirectory()) return stat.mtimeMs;
+    return readdirSync(pathname, { withFileTypes: true }).reduce((latest, item) => (
+        Math.max(latest, latestModified(path.join(pathname, item.name)))
+    ), stat.mtimeMs);
+};
+
+const run = (command, args, shell = false) => new Promise((resolve, reject) => {
     const child = spawn(command, args, {
         cwd: projectRoot,
-        shell: process.platform === 'win32',
+        env: process.env,
+        shell,
         stdio: 'inherit',
         windowsHide: true
     });
     child.once('error', reject);
     child.once('exit', (code) => {
         if (code === 0) resolve();
-        else reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}`));
+        else reject(new Error(`${path.basename(command)} ${args.join(' ')} failed with exit code ${code}`));
     });
 });
 
-const ensureBuild = async () => {
-    const entry = path.join(distRoot, 'index.js');
-    const latestModified = (pathname) => {
-        if (!existsSync(pathname)) return 0;
-        const stat = statSync(pathname);
-        if (!stat.isDirectory()) return stat.mtimeMs;
-        return readdirSync(pathname, { withFileTypes: true }).reduce((latest, item) => (
-            Math.max(latest, latestModified(path.join(pathname, item.name)))
-        ), stat.mtimeMs);
-    };
-    const inputs = [
-        'src', 'static', 'package.json', 'package-lock.json',
-        'rollup.config.mjs', 'copy-and-watch.mjs', 'tsconfig.json'
-    ].map(filename => path.join(projectRoot, filename));
-    const buildTime = existsSync(entry) ? statSync(entry).mtimeMs : 0;
-    const sourceTime = Math.max(...inputs.map(latestModified));
-    if (!rebuild && buildTime >= sourceTime) return;
+const runNpm = args => run(npmRunner.command, [...npmRunner.prefix, ...args], npmRunner.shell);
 
-    const dependencyStamp = path.join(projectRoot, 'node_modules', '.package-lock.json');
+const npmVersion = () => {
+    const result = spawnSync(npmRunner.command, [...npmRunner.prefix, '--version'], {
+        cwd: projectRoot,
+        env: process.env,
+        encoding: 'utf8',
+        shell: npmRunner.shell,
+        windowsHide: true
+    });
+    return result.status === 0 ? result.stdout.trim() : 'unavailable';
+};
+
+const section = title => console.log(`\n[${title}]${'-'.repeat(Math.max(1, 58 - title.length))}`);
+const line = (label, value) => console.log(`${label.padEnd(20)}: ${value}`);
+
+const buildInputs = [
+    'src', 'static', 'package.json', 'package-lock.json',
+    'rollup.config.mjs', 'copy-and-watch.mjs', 'tsconfig.json'
+].map(filename => path.join(projectRoot, filename));
+const checkInputs = [
+    'src', 'static/locales', 'package.json', 'package-lock.json',
+    'eslint.config.mjs', 'tsconfig.json',
+    'scripts/check-locales.mjs', 'scripts/test-core-logic.mjs',
+    'scripts/dependency-report.mjs'
+].map(filename => path.join(projectRoot, filename));
+
+const prepareProject = async () => {
+    const entry = path.join(distRoot, 'index.js');
     const lockfile = path.join(projectRoot, 'package-lock.json');
-    const dependenciesStale = !existsSync(dependencyStamp) ||
-        statSync(dependencyStamp).mtimeMs < statSync(lockfile).mtimeMs;
-    if (dependenciesStale) {
-        console.log('Installing project dependencies...');
-        await run(npmCommand, ['ci']);
+    const dependencyRoot = path.join(projectRoot, 'node_modules');
+    const dependencyStamp = path.join(dependencyRoot, '.package-lock.json');
+    const checkStamp = path.join(dependencyRoot, '.superspalt-check.json');
+    const buildTime = existsSync(entry) ? statSync(entry).mtimeMs : 0;
+    const sourceTime = Math.max(...buildInputs.map(latestModified));
+    const checkSourceTime = Math.max(...checkInputs.map(latestModified));
+    const buildNeeded = rebuild || buildTime < sourceTime;
+    const dependenciesPresent = existsSync(dependencyRoot) && existsSync(dependencyStamp);
+    const dependenciesStale = !dependenciesPresent || statSync(dependencyStamp).mtimeMs < statSync(lockfile).mtimeMs;
+    const bundledBuildMode = !buildNeeded && !dependenciesPresent && !forceInstall && !forceCheck && !setupOnly;
+    const directCount = Object.keys({
+        ...(packageJson.dependencies ?? {}),
+        ...(packageJson.devDependencies ?? {})
+    }).length;
+    const lockedCount = Math.max(0, Object.keys(packageLock.packages ?? {}).length - 1);
+
+    section('Environment preflight');
+    line('Project', `${packageJson.name} v${packageJson.version}`);
+    line('Platform', `${process.platform} ${process.arch}`);
+    line('Node.js', `v${process.versions.node} (${process.execPath})`);
+    line('npm', `v${npmVersion()}`);
+    line('Required Node.js', packageJson.engines?.node ?? 'not specified');
+    line('Recommended Node.js', `v${recommendedNodeVersion} LTS (.nvmrc)`);
+    line('Direct dependencies', directCount);
+    line('Locked packages', lockedCount);
+    line('Dependencies', dependenciesPresent ? dependenciesStale ? 'stale' : 'ready' : 'missing');
+    line('Build', buildTime === 0 ? 'missing' : buildNeeded ? 'stale' : 'ready');
+    line('Validation', skipCheck ? 'disabled by --no-check' : 'enabled (cached when unchanged)');
+
+    if (bundledBuildMode) {
+        console.log('\nUsing the bundled release build. Dependency installation and source checks are not required.');
+        return { installed: false, checked: false, built: false, bundled: true };
     }
-    console.log('Building SuperSplat and the trajectory tools...');
-    await run(npmCommand, ['run', 'build']);
+
+    let installed = false;
+    if (forceInstall || dependenciesStale) {
+        section('Deterministic dependency installation');
+        line('Reason', forceInstall ? 'forced by --install/--repair' : dependenciesPresent ?
+            'package-lock.json changed' : 'node_modules is missing');
+        line('Command', 'npm ci --no-fund');
+        line('Policy', 'package-lock.json is authoritative; package ranges are not upgraded');
+        await runNpm(['ci', '--no-fund']);
+        installed = true;
+        await run(process.execPath, ['scripts/dependency-report.mjs', '--compact']);
+    } else {
+        section('Dependency installation');
+        console.log('All locked dependencies are present; npm ci is not required.');
+    }
+
+    let checked = false;
+    if (!skipCheck) {
+        const previousCheckTime = existsSync(checkStamp) ? statSync(checkStamp).mtimeMs : 0;
+        let previousCheck = {};
+        try {
+            previousCheck = existsSync(checkStamp) ? JSON.parse(readFileSync(checkStamp, 'utf8')) : {};
+        } catch {
+            // An invalid cache is treated as a cache miss.
+        }
+        const runtimeChanged = previousCheck.node !== process.versions.node ||
+            previousCheck.platform !== `${process.platform}-${process.arch}`;
+        const checkNeeded = forceCheck || installed || runtimeChanged || previousCheckTime < checkSourceTime;
+        section('Default project validation');
+        if (checkNeeded) {
+            line('Reason', forceCheck ? 'forced by --check/--repair' : installed ?
+                'dependencies were installed' : runtimeChanged ?
+                    'Node.js version or platform changed' : 'source or configuration changed');
+            line('Checks', 'dependency integrity, ESLint, locales, core tests, TypeScript');
+            await runNpm(['run', 'check']);
+            writeFileSync(checkStamp, `${JSON.stringify({
+                checkedAt: new Date().toISOString(),
+                node: process.versions.node,
+                platform: `${process.platform}-${process.arch}`,
+                sourceTime: checkSourceTime
+            }, null, 2)}\n`);
+            checked = true;
+        } else {
+            console.log('The current source and lockfile already passed validation; cached result reused.');
+        }
+    }
+
+    let built = false;
+    if (buildNeeded) {
+        section('Application build');
+        line('Reason', rebuild ? 'forced by --rebuild/--repair' : buildTime === 0 ?
+            'dist/index.js is missing' : 'source is newer than dist/index.js');
+        line('Output', path.join(projectRoot, 'dist'));
+        await runNpm(['run', 'build']);
+        built = true;
+    } else {
+        section('Application build');
+        console.log('dist/index.js is current; rebuild is not required.');
+    }
+
+    return { installed, checked, built, bundled: false };
 };
 
 const mimeTypes = new Map([
@@ -127,6 +298,7 @@ const startServer = async (port = requestedPort) => {
         if (port >= requestedPort + 19) {
             throw new Error(`No free port was found from ${requestedPort} to ${requestedPort + 19}`);
         }
+        console.log(`Port ${port} is busy; trying ${port + 1}...`);
         return startServer(port + 1);
     }
 };
@@ -167,19 +339,33 @@ const launchBrowser = (url) => {
     spawn('xdg-open', [url], detached).unref();
 };
 
-try {
-    await ensureBuild();
+const main = async () => {
+    if (startupProblems.length > 0) throw new Error(startupProblems.join('; '));
+    const result = await prepareProject();
+    if (setupOnly) {
+        section('Setup complete');
+        line('Dependencies installed', result.installed ? 'yes' : 'already current');
+        line('Validation executed', result.checked ? 'yes' : skipCheck ? 'skipped' : 'cached');
+        line('Application built', result.built ? 'yes' : 'already current');
+        console.log('\nRun start-windows.cmd, start-macos.command, or npm run app:start to launch.\n');
+        return;
+    }
+
     const { server, port } = await startServer();
     const buildStamp = statSync(path.join(distRoot, 'index.js')).mtimeMs.toFixed(0);
     const url = `http://localhost:${port}/?build=${buildStamp}`;
-    console.log(`\nSuperSplat is ready: ${url}`);
-    console.log('Press Ctrl+C to stop the local server.\n');
+    section('Ready');
+    console.log(`SuperSpalt Trajectory: ${url}`);
+    console.log('Press Ctrl+C to stop the local server.');
     if (!process.argv.includes('--no-open')) launchBrowser(url);
 
     const shutdown = () => server.close(() => process.exit(0));
     process.once('SIGINT', shutdown);
     process.once('SIGTERM', shutdown);
-} catch (error) {
-    console.error(`\nUnable to start SuperSplat: ${error instanceof Error ? error.message : error}`);
+};
+
+main().catch((error) => {
+    console.error(`\nUnable to prepare or start SuperSpalt: ${error instanceof Error ? error.message : error}`);
+    console.error('Recovery: run with --repair, or review docs/DEPENDENCIES.zh-CN.md.');
     process.exitCode = 1;
-}
+});

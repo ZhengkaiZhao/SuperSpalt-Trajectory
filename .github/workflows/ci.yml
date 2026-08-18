@@ -22,7 +22,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22.x]
+        node-version: [22.x, 24.x]
 
     steps:
     - name: Checkout code
@@ -40,15 +40,15 @@ jobs:
     - name: Build
       run: npm run build
 
-  lint:
-    name: Lint
+  quality:
+    name: Quality
     runs-on: ubuntu-latest
 
     timeout-minutes: 10
 
     strategy:
       matrix:
-        node-version: [22.x]
+        node-version: [24.x]
 
     steps:
     - name: Checkout code
@@ -63,8 +63,5 @@ jobs:
     - name: Install
       run: npm ci
 
-    - name: Lint
-      run: npm run lint
-
-    - name: Lint locales
-      run: npm run lint:locales
+    - name: Dependency, lint, locale, test and type checks
+      run: npm run check

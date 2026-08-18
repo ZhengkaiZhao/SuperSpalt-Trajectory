@@ -6,7 +6,7 @@
 
 ### 1.1 必要环境
 
-- Node.js 20.19 或更高版本。
+- Node.js 22.0 或更高版本；推荐并测试 Node.js 24.19.0 LTS。
 - 支持 WebGPU 的新版 Google Chrome 或 Microsoft Edge。
 - NVIDIA RTX 并非必需，但大规模高斯模型建议使用独立显卡。
 
@@ -21,9 +21,9 @@ npm --version
 
 - 普通启动：双击 `start-windows.cmd`。
 - RTX 专用启动：双击 `SuperSplat RTX.cmd`。
-- 强制重建：在命令行运行 `start-windows.cmd --rebuild`。
+- 完整修复：在命令行运行 `start-windows.cmd --repair`。
 
-普通启动器会优先使用 Chrome，并携带高性能 GPU 参数；RTX 启动器还会使用独立的 Chrome 用户配置，避免普通 Chrome 进程忽略 GPU 参数。
+启动脚本会先显示已安装、最低支持和推荐 Node.js 版本。缺失或低于最低版本时必须安装；低于推荐版本但仍受支持时可以暂不升级。Windows 默认询问是否通过 `winget` 安装 Node.js LTS。普通启动器会优先使用 Chrome，并携带高性能 GPU 参数；RTX 启动器还会使用独立的 Chrome 用户配置，避免普通 Chrome 进程忽略 GPU 参数。
 
 ### 1.3 macOS
 
@@ -34,18 +34,33 @@ chmod +x start-macos.command
 ./start-macos.command
 ```
 
-脚本会优先以 Chrome 应用窗口启动。若 Chrome 不存在，会回退到系统默认浏览器。
+脚本会检查 Node.js 版本；需要升级时可通过 Homebrew 安装 `node@24`。随后优先以 Chrome 应用窗口启动；若 Chrome 不存在，会回退到系统默认浏览器。
 
 ### 1.4 启动器行为
 
 启动器会执行以下检查：
 
-1. 验证 Node.js 版本。
-2. 判断 `dist/index.js` 是否存在以及源码是否比构建产物更新。
-3. 需要构建时，检查 `package-lock.json` 与依赖安装状态。
-4. 仅在依赖缺失或过期时运行 `npm ci`。
-5. 从端口 `3011` 开始寻找可用端口，最多尝试 20 个端口。
-6. 启动仅监听 `127.0.0.1` 的本地服务。
+1. 显示项目、操作系统、Node.js、npm、直接依赖数、锁定包数、构建和校验状态。
+2. 验证 Node.js 不低于 22.0，并提示推荐的 24.19.0 LTS。
+3. 仅在 `node_modules` 缺失、`package-lock.json` 更新或指定 `--install` 时运行 `npm ci --no-fund`。
+4. 安装严格服从锁文件，不使用 `npm update`，普通启动不会改变声明或锁定版本。
+5. 源码、配置、Node.js 版本或平台变化后默认执行依赖一致性、ESLint、语言包、核心逻辑测试和 TypeScript 检查；成功结果会缓存，未变化时直接复用。
+6. `dist/index.js` 缺失、源码更新或指定 `--rebuild` 时执行构建。
+7. 从端口 `3011` 开始寻找可用端口，最多尝试 20 个端口；服务仅监听 `127.0.0.1`。
+
+启动与恢复参数：
+
+| 参数 | 作用 |
+| --- | --- |
+| `--install` | 强制按锁文件重新安装依赖 |
+| `--check` | 强制执行全部质量检查 |
+| `--rebuild` | 强制重新生成 `dist/` |
+| `--repair` | 依次强制安装、检查和构建 |
+| `--setup-only` | 完成环境准备后退出，不启动服务器 |
+| `--no-check` | 本次启动跳过检查，不建议用于发布 |
+| `--port=3020` | 指定首选端口 |
+| `--strict-port` | 端口被占用时直接报错 |
+| `--no-open` | 不自动打开浏览器 |
 
 ## 2. 界面与基础操作
 
@@ -279,7 +294,7 @@ GPU framebuffer 的像素原点位于左下，普通图片文件的像素原点�
 
 ### 提示 Node.js 版本过低
 
-安装 Node.js 20.19 或更高版本，关闭旧终端后重新运行启动脚本。
+安装 Node.js 22 或更高版本，推荐 24.19.0 LTS。Windows 可重新运行启动器并确认 `winget` 升级；macOS 可执行 `brew install node@24` 或 `brew upgrade node@24`。升级后关闭旧终端，再重新运行启动脚本。
 
 ### RTX 启动后仍显示集成显卡
 

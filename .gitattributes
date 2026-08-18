@@ -4,12 +4,15 @@
 *.ps1 text eol=crlf
 *.command text eol=lf
 *.sh text eol=lf
+*.zsh text eol=lf
 *.mjs text eol=lf
 *.ts text eol=lf
 *.scss text eol=lf
 *.json text eol=lf
 *.md text eol=lf
 *.svg text eol=lf
+.nvmrc text eol=lf
+.node-version text eol=lf
 
 *.jpg binary
 *.png binary

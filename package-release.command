@@ -1,9 +1,12 @@
 #!/bin/zsh
+set -u
 cd "$(dirname "$0")"
-if ! command -v node >/dev/null 2>&1; then
-    echo "Node.js 20.19 or newer is required."
+source "scripts/ensure-node-macos.zsh"
+if ! ensure_superspalt_node; then
     read -r "?Press Return to close..."
     exit 1
 fi
-node scripts/package-source.mjs
+"$SUPERSPLAT_NODE_EXE" scripts/package-source.mjs
+status=$?
 read -r "?Press Return to close..."
+exit $status

@@ -2,7 +2,9 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $buildFile = Join-Path $repoRoot 'dist\index.js'
-$nodePath = (Get-Command node.exe -ErrorAction Stop).Source
+& (Join-Path $PSScriptRoot 'ensure-node-windows.ps1')
+$nodePath = $env:SUPERSPLAT_NODE_EXE
+if (-not $nodePath) { throw 'Node.js was not found after environment preparation.' }
 $chromePath = @(
     (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
     $(if (${env:ProgramFiles(x86)}) { Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe' }),

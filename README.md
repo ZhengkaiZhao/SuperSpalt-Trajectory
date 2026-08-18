@@ -4,23 +4,23 @@
 
 ## Windows 启动
 
-环境要求：Windows 10/11、[Node.js 20.19+](https://nodejs.org/) 和支持 WebGPU 的 Chrome 或 Edge。
+环境要求：Windows 10/11、Node.js 22+ 和支持 WebGPU 的 Chrome 或 Edge。推荐使用项目测试版本 Node.js 24.19.0 LTS；双击启动器会先检查版本，并在需要时询问是否通过 `winget` 安装或升级。
 
 1. 双击 [`start-windows.cmd`](start-windows.cmd)。
-2. 脚本会按需执行 `npm ci`、构建项目、寻找 `3011-3030` 的可用端口并打开应用。
+2. 脚本会检查 Node/npm、依赖锁文件、源码校验缓存与构建状态，再按需执行 `npm ci`、完整检查和构建。
 3. 保持命令窗口运行；按 `Ctrl+C` 停止本地服务。
 
 NVIDIA/RTX 用户可以双击 [`SuperSplat RTX.cmd`](SuperSplat%20RTX.cmd)。该入口使用独立 Chrome 配置和高性能 GPU 参数，且不包含任何固定用户目录。
 
-强制重新安装/构建：
+依赖或构建异常时执行完整修复：
 
 ```bat
-start-windows.cmd --rebuild
+start-windows.cmd --repair
 ```
 
 ## macOS 启动
 
-环境要求：macOS、[Node.js 20.19+](https://nodejs.org/) 和支持 WebGPU 的 Chrome。
+环境要求：macOS、Node.js 22+ 和支持 WebGPU 的 Chrome。推荐 Node.js 24.19.0 LTS；启动器可通过 Homebrew 安装或升级 `node@24`。
 
 1. 首次下载后，在终端执行：
 
@@ -32,10 +32,10 @@ start-windows.cmd --rebuild
 3. 若系统阻止运行，请右键脚本并选择“打开”。
 4. 保持终端窗口运行；按 `Control+C` 停止本地服务。
 
-强制重新安装/构建：
+依赖或构建异常时执行完整修复：
 
 ```sh
-./start-macos.command --rebuild
+./start-macos.command --repair
 ```
 
 ## 主要功能
@@ -52,6 +52,7 @@ start-windows.cmd --rebuild
 完整使用步骤、坐标约定和故障排查见：
 
 - [中文操作手册](docs/USER_GUIDE.zh-CN.md)
+- [Node.js、依赖安装与升级说明](docs/DEPENDENCIES.zh-CN.md)
 - [原版 SuperSplat 基础指南](docs/index.md)
 - [分发与打包说明](DISTRIBUTION.md)
 
@@ -64,15 +65,19 @@ npm ci
 npm run app:start
 ```
 
-也可以不预先安装依赖，直接使用系统对应的双击启动脚本；缺失依赖会自动安装。
+也可以不预先安装依赖，直接使用系统对应的双击启动脚本。安装严格使用 `package-lock.json`：缺失或过期时执行 `npm ci`，不会在普通启动中静默升级依赖版本。
 
 ## 常用命令
 
 ```sh
 npm run app:start          # 按需构建并启动，默认自动打开浏览器
 npm run app:start:rebuild  # 强制重新构建并启动
+npm run setup              # 按需安装/构建并强制检查，但不启动服务器
+npm run doctor             # 输出声明、锁定和已安装的完整依赖清单
+npm run doctor:outdated    # 查询 npm registry 中可用的新版本
+npm run deps:check         # 验证直接依赖与锁文件完全一致
 npm run develop            # 开发模式：监听源码并自动构建
-npm run check              # ESLint、语言包、核心测试和 TypeScript 检查
+npm run check              # 依赖、ESLint、语言包、核心测试和 TypeScript 检查
 npm run build              # 生成 release 构建到 dist/
 npm run release:zip        # 生成可分发 ZIP 到 release/
 ```
@@ -82,6 +87,8 @@ npm run release:zip        # 生成可分发 ZIP 到 release/
 ```sh
 node scripts/start-local.mjs --port=3020 --no-open
 ```
+
+常用恢复参数：`--install` 仅强制重装依赖，`--check` 强制完整校验，`--rebuild` 强制构建，`--repair` 一次执行三者，`--setup-only` 只准备环境不启动服务。运行 `node scripts/start-local.mjs --help` 可查看全部参数。
 
 ## 目录说明
 

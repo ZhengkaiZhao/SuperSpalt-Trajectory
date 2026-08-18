@@ -18,12 +18,11 @@ const stamp = [
 const archiveName = `SuperSplat-Trajectory-${packageJson.version}-${stamp}.zip`;
 const archivePath = path.join(outputRoot, archiveName);
 const archivePrefix = 'SuperSplat-Trajectory';
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const run = (command, args) => new Promise((resolve, reject) => {
     const child = spawn(command, args, {
         cwd: projectRoot,
-        shell: process.platform === 'win32',
+        shell: false,
         stdio: 'inherit',
         windowsHide: true
     });
@@ -46,9 +45,9 @@ const addGlob = (archive, directory, ignore = []) => {
 };
 
 try {
+    console.log('Preparing dependencies, checks, and the latest application build...');
+    await run(process.execPath, ['scripts/start-local.mjs', '--setup-only', '--check']);
     const { ZipArchive } = await import('archiver');
-    console.log('Building the latest application and trajectory tools...');
-    await run(npmCommand, ['run', 'build']);
 
     mkdirSync(outputRoot, { recursive: true });
     const output = createWriteStream(archivePath);
@@ -68,6 +67,8 @@ try {
 
     const rootFiles = [
         '.gitignore',
+        '.node-version',
+        '.nvmrc',
         'copy-and-watch.mjs',
         'DISTRIBUTION.md',
         'eslint.config.mjs',
