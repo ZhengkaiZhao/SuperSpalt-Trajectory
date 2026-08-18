@@ -791,12 +791,11 @@ class Camera extends Element {
         }
 
         const { scene } = this;
-        const distance = result.distance * QUICK_FOCUS_DISTANCE_RATIO;
-        const normalizedDistance = distance / Math.max(this.sceneRadius, 1e-8) * this.fovFactor;
+        const normalizedDistance = result.distance / this.sceneRadius * this.fovFactor;
 
         scene.events.fire('camera.setControlMode', 'orbit');
         this.setFocalPoint(result.position, QUICK_FOCUS_DAMPING_FACTOR);
-        this.setDistance(normalizedDistance, QUICK_FOCUS_DAMPING_FACTOR);
+        this.setDistance(normalizedDistance * QUICK_FOCUS_DISTANCE_RATIO, QUICK_FOCUS_DAMPING_FACTOR);
         scene.events.fire('camera.quickFocusPicked', {
             camera: this,
             splat: result.splat,
