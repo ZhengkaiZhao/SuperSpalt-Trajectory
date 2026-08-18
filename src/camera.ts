@@ -47,10 +47,9 @@ const va = new Vec3();
 const m = new Mat4();
 const v4 = new Vec4();
 
-// Stop short of the picked surface so the camera approaches the object
-// without entering the splat volume. The scene damping factor turns 0.75
-// into a short, visible transition (0.15 seconds with the default config).
-const QUICK_FOCUS_DISTANCE_RATIO = 0.3;
+// Quick focus moves the camera to a comfortable viewing distance based on
+// scene size, similar to frame-selection but triggered by clicking a point.
+// The damping factor creates a short, visible transition (~0.15 seconds).
 const QUICK_FOCUS_DAMPING_FACTOR = 0.75;
 
 // modulo dealing with negative numbers
@@ -782,8 +781,8 @@ class Camera extends Element {
         }
     }
 
-    // Move toward a visible point and make it the orbit center. Unlike the
-    // normal focal-point picker, this deliberately reduces camera distance.
+    // Move toward a visible point and make it the orbit center. Sets a
+    // comfortable viewing distance based on scene size, not the pick distance.
     async quickFocusPoint(x: number, y: number) {
         const result = await this.intersect(x, y);
         if (!result || !Number.isFinite(result.distance) || result.distance <= 0) {
@@ -791,11 +790,14 @@ class Camera extends Element {
         }
 
         const { scene } = this;
-        const normalizedDistance = result.distance / this.sceneRadius * this.fovFactor;
+
+        // Use a fixed comfortable viewing distance relative to scene size,
+        // similar to frame-selection, rather than basing it on pick depth
+        const comfortableDistance = 1.5;
 
         scene.events.fire('camera.setControlMode', 'orbit');
         this.setFocalPoint(result.position, QUICK_FOCUS_DAMPING_FACTOR);
-        this.setDistance(normalizedDistance * QUICK_FOCUS_DISTANCE_RATIO, QUICK_FOCUS_DAMPING_FACTOR);
+        this.setDistance(comfortableDistance, QUICK_FOCUS_DAMPING_FACTOR);
         scene.events.fire('camera.quickFocusPicked', {
             camera: this,
             splat: result.splat,
