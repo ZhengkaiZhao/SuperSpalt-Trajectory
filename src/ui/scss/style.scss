@@ -1,0 +1,477 @@
+@use 'pcui-theme-grey.scss';
+@use 'colors.scss' as *;
+@use 'tooltips.scss';
+@use 'panel.scss';
+@use 'menu-panel.scss';
+@use 'menu.scss';
+@use 'scene-panel.scss';
+@use 'settings-panel.scss';
+@use 'color-panel.scss';
+@use 'splat-list.scss';
+@use 'transform.scss';
+@use 'bottom-toolbar.scss';
+@use 'right-toolbar.scss';
+@use 'select-toolbar.scss';
+@use 'data-panel.scss';
+@use 'popup.scss';
+@use 'mode-toggle.scss';
+@use 'settings-dialog.scss';
+@use 'spinner.scss';
+@use 'progress.scss';
+@use 'export-popup.scss';
+@use 'shortcuts-popup.scss';
+@use 'camera-parameters-panel.scss';
+@use 'trajectory-planner-panel.scss';
+@use 'about-popup.scss';
+@use 'timeline-panel.scss';
+@use 'status-bar.scss';
+@use 'tool.scss';
+
+* {
+    font-size: 12px;
+    user-select: none;
+}
+
+// not on '*' - that breaks wheel scrolling over overflow:hidden elements (e.g. pcui labels)
+html {
+    height: 100%;
+    overscroll-behavior: none;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    max-height: 100%;
+    background-color: black;
+    overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: none;
+}
+
+#gpu-required-message {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+    background: #151719;
+    color: #f2f3f5;
+    text-align: center;
+
+    strong {
+        color: #ff6b5e;
+        font-size: 20px;
+    }
+
+    span {
+        max-width: 640px;
+        color: #c9cdd2;
+        font-size: 13px;
+        line-height: 20px;
+    }
+}
+
+#app-container {
+    width: 100%;
+    height: 100%;
+}
+
+#editor-container {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: row;
+}
+
+#main-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+}
+
+#sep-container {
+    background-color: $bcg-darker;
+}
+
+#sep-container > span {
+    color: white;
+}
+
+#coord-space-toggle.active {
+    background-color: $bcg-dark !important;
+    color: #f60;
+}
+
+#file-selector {
+    display: none;
+}
+
+#file-menu {
+    position: absolute;
+}
+
+.file-menu-item span {
+    padding: 6px;
+    color: $text-secondary !important;
+    font-size: 14px;
+}
+
+#app-label {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    color: $text-primary;
+    text-shadow: 1px 1px 4px black;
+}
+
+#performance-hud {
+    position: absolute;
+    box-sizing: border-box;
+    top: 12px;
+    right: 158px;
+    z-index: 12;
+    display: flex;
+    min-width: 300px;
+    max-width: min(520px, calc(100vw - 190px));
+    padding: 7px 10px;
+    flex-direction: column;
+    align-items: stretch;
+    border: 1px solid rgba(48, 224, 117, 0.65);
+    border-radius: 6px;
+    background: rgba(10, 20, 14, 0.82);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+
+    #performance-primary {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+    }
+
+    #performance-primary-middle {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        overflow: hidden;
+    }
+
+    #performance-fps {
+        margin: 0;
+        color: #3ee778;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 15px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        line-height: 18px;
+    }
+
+    #performance-trajectory {
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        color: #ffd65c;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 14px;
+        text-align: right;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #performance-adapter {
+        flex: 0 0 auto;
+        margin: 0;
+        color: #91d9a9;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 14px;
+        white-space: nowrap;
+    }
+
+    #performance-pose-toggle {
+        width: 43px;
+        min-width: 43px;
+        height: 20px;
+        margin: 0;
+        padding: 0 5px;
+        border: 1px solid rgba(145, 217, 169, 0.4);
+        color: #91d9a9;
+        background: rgba(0, 0, 0, 0.25);
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 9px;
+        line-height: 18px;
+        pointer-events: auto;
+
+        &.active {
+            border-color: #ffd65c;
+            color: #151006;
+            background: #ffd65c;
+        }
+    }
+
+    #performance-point {
+        max-width: 420px;
+        margin: 4px 0 1px;
+        padding-top: 4px;
+        border-top: 1px solid rgba(255, 214, 92, 0.28);
+        color: #ffe79c;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        line-height: 13px;
+        white-space: normal;
+    }
+
+    #performance-detail {
+        max-width: 300px;
+        margin: 2px 0 0;
+        overflow: hidden;
+        color: #91d9a9;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 10px;
+        line-height: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #performance-pose {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 24px;
+        align-items: center;
+        gap: 6px;
+        margin-top: 5px;
+        padding-top: 5px;
+        border-top: 1px solid rgba(62, 231, 120, 0.22);
+    }
+
+    #performance-pose-value {
+        min-width: 0;
+        margin: 0;
+        overflow-wrap: anywhere;
+        color: #d8f8e2;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        line-height: 14px;
+        user-select: text;
+        white-space: normal;
+    }
+
+    #performance-pose-copy {
+        width: 24px;
+        min-width: 24px;
+        height: 24px;
+        margin: 0;
+        padding: 0;
+        color: #91d9a9;
+        background: rgba(0, 0, 0, 0.25);
+        pointer-events: auto;
+
+        &.copied {
+            color: #151006;
+            background: #3ee778;
+        }
+    }
+
+}
+
+@media (max-width: 600px) {
+    #performance-hud {
+        top: 8px;
+        right: 88px;
+        min-width: min(300px, calc(100vw - 104px));
+        max-width: calc(100vw - 104px);
+
+        #performance-detail {
+            max-width: 190px;
+        }
+    }
+}
+
+#camera-info-overlay {
+    position: absolute;
+    left: 12px;
+    bottom: 17px;
+    text-shadow: 1px 1px 4px black;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+
+    .camera-info-row {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        padding: 1px 0;
+        font-family: inherit;
+    }
+
+    .camera-info-key {
+        margin: 0;
+        color: $clr-icon-hilight;
+        font-family: inherit;
+        font-weight: bold;
+        overflow: visible;
+    }
+
+    .camera-info-value {
+        margin: 0 0 0 8px;
+        color: $text-primary;
+        font-family: inherit;
+        font-variant-numeric: tabular-nums;
+        overflow: visible;
+        cursor: text;
+        user-select: text;
+        padding: 0 4px;
+        border-radius: 4px;
+        border: 1px solid transparent;
+        outline: none;
+        transition: background-color 0.15s ease;
+
+        &:hover {
+            background-color: rgba(0, 0, 0, 0.25);
+        }
+
+        &:focus {
+            border-color: $clr-hilight;
+            background-color: rgba(0, 0, 0, 0.25);
+        }
+
+        &.flash-ok {
+            background-color: rgba(120, 220, 140, 0.35);
+        }
+
+        &.flash-bad {
+            background-color: rgba(220, 100, 100, 0.45);
+        }
+    }
+}
+
+#view-cube-container {
+    position: absolute;
+    width: 140px;
+    height: 140px;
+    right: 0px;
+    top: 0px;
+    pointer-events: none;
+}
+
+#mask-canvas {
+    display: none;
+    position: absolute;
+    opacity: 0.4;
+}
+
+#canvas-container {
+    width: 100%;
+    display: flex;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+}
+
+#tools-container {
+    display: none;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    &.noevents {
+        pointer-events: none;
+    }
+}
+
+#canvas {
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+}
+
+#tooltips-container {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+#top-container {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+// placeholder
+.pcui-input-element[placeholder] {
+    &::after {
+        color: $text-darkest;
+    }
+}
+
+.pcui-vector-input {
+    margin-left: 6px;
+    margin-right: 6px;
+}
+
+/* scrollbar styling */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: $bcg-darkest;
+}
+::-webkit-scrollbar-thumb {
+    background: $bcg-lighter;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: $clr-hilight;
+}
+::-webkit-scrollbar-corner {
+    background: $bcg-darkest;
+}
+
+.font-thin {
+    font-family: 'Proxima Nova Thin', 'Helvetica Neue', Arial, Helvetica, sans-serif;
+    font-weight: 100;
+    font-style: normal;
+}
+
+.font-light {
+    font-family: 'Proxima Nova Light', 'Helvetica Neue', Arial, Helvetica, sans-serif;
+    font-weight: 200;
+    font-style: normal;
+}
+
+.font-regular {
+    font-family: 'Proxima Nova Regular', 'Helvetica Neue', Arial, Helvetica, sans-serif;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.font-bold {
+    font-family: 'Proxima Nova Bold', 'Helvetica Neue', Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    font-style: normal;
+}

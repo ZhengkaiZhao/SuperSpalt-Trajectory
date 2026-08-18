@@ -1,0 +1,292 @@
+@use 'colors.scss' as *;
+
+#camera-parameters-panel {
+    position: absolute;
+    top: 48px;
+    right: 68px;
+    z-index: 40;
+    width: 440px;
+    max-width: calc(100% - 24px);
+    max-height: calc(100% - 96px);
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    border: 1px solid $bcg-lighter;
+    border-radius: 8px;
+    background-color: $bcg-primary;
+    filter: drop-shadow(4px 6px 10px rgba(0, 0, 0, 0.65));
+    pointer-events: all;
+
+    &.pcui-hidden {
+        display: none;
+    }
+
+    #camera-parameters-header {
+        display: flex;
+        flex: 0 0 34px;
+        align-items: center;
+        min-height: 34px;
+        background-color: $bcg-darker;
+        cursor: move;
+
+        #camera-parameters-title {
+            flex: 1 1 auto;
+            margin: 0;
+            padding: 0 12px;
+            color: $text-primary;
+            font-weight: 600;
+            line-height: 34px;
+            text-transform: uppercase;
+        }
+
+        #camera-parameters-close {
+            width: 34px;
+            height: 34px;
+            margin: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            color: $text-secondary;
+            font-size: 20px;
+            line-height: 28px;
+            cursor: pointer;
+
+            &:hover {
+                color: $text-primary;
+                background-color: $bcg-dark;
+            }
+        }
+    }
+
+    #camera-parameters-preview {
+        flex: 1 1 auto;
+        min-height: 180px;
+        max-height: 48vh;
+        margin: 0;
+        padding: 12px;
+        overflow: auto;
+        border: 0;
+        border-bottom: 1px solid $bcg-lighter;
+        background-color: $bcg-darkest;
+        color: $text-primary;
+        font-family: 'SF Mono', 'Roboto Mono', Consolas, monospace;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        line-height: 17px;
+        user-select: text;
+        white-space: pre;
+    }
+
+    #camera-parameters-selection-title {
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 9px 12px 5px;
+        color: $clr-hilight;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    #camera-parameters-selection {
+        display: grid;
+        flex: 0 0 auto;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0 16px;
+        padding: 0 12px 8px;
+
+        .camera-parameters-option {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            height: 28px;
+
+            .camera-parameters-option-label {
+                flex: 1 1 auto;
+                min-width: 0;
+                margin: 0;
+                overflow: hidden;
+                color: $text-secondary;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .camera-parameters-option-input {
+                flex: 0 0 auto;
+                margin-left: 8px;
+            }
+        }
+    }
+
+    #wan-trajectory-title {
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 9px 12px 5px;
+        border-top: 1px solid $bcg-lighter;
+        color: $clr-hilight;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    #wan-trajectory-controls {
+        display: grid;
+        flex: 0 0 auto;
+        grid-template-columns: auto 76px auto 76px;
+        gap: 8px;
+        align-items: center;
+        padding: 4px 12px 8px;
+
+        > .pcui-label {
+            margin: 0;
+            color: $text-secondary;
+            white-space: nowrap;
+        }
+
+        > .pcui-numeric-input {
+            min-width: 0;
+        }
+
+        > :nth-child(5) {
+            grid-column: 1;
+        }
+
+        > :nth-child(6) {
+            grid-column: 2;
+        }
+
+        #wan-trajectory-export {
+            grid-column: 1 / -1;
+            height: 30px;
+            margin: 0;
+            color: $text-primary;
+            background-color: $clr-hilight;
+        }
+    }
+
+    #wan-trajectory-status {
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 0 12px 8px;
+        color: $text-secondary;
+        font-size: 11px;
+    }
+
+    #wan-trajectory-required-note {
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 0 12px 4px;
+        color: #ffb35c;
+        font-size: 11px;
+    }
+
+    #trajectory-file-title,
+    #trajectory-image-title {
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 9px 12px 5px;
+        border-top: 1px solid $bcg-lighter;
+        color: $clr-hilight;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    #trajectory-file-actions,
+    #trajectory-image-actions {
+        display: grid;
+        flex: 0 0 auto;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 2px 12px 6px;
+
+        > .pcui-button {
+            height: 30px;
+            margin: 0;
+            color: $text-primary;
+            background-color: $clr-hilight;
+        }
+    }
+
+    #trajectory-file-status {
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 0 12px 8px;
+        color: $text-secondary;
+        font-size: 11px;
+    }
+
+    #trajectory-image-status {
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 0 12px 8px;
+        color: $text-secondary;
+        font-size: 11px;
+        line-height: 16px;
+    }
+
+    #trajectory-image-actions {
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+
+        #trajectory-image-save {
+            background-color: $clr-hilight;
+        }
+    }
+
+    #camera-parameters-footer {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 42px;
+        padding: 4px 8px;
+        border-top: 1px solid $bcg-lighter;
+        background-color: $bcg-darker;
+
+        #camera-parameters-secondary-actions {
+            display: flex;
+
+            .camera-parameters-secondary-button {
+                height: 30px;
+                margin: 0 4px 0 0;
+                padding: 0 10px;
+                border-radius: 4px;
+                background-color: $bcg-dark;
+            }
+        }
+
+        #camera-parameters-save {
+            min-width: 126px;
+            height: 30px;
+            margin: 0;
+            border-radius: 4px;
+            color: $text-primary;
+            background-color: $clr-hilight;
+        }
+    }
+}
+
+@media (max-width: 600px) {
+    #camera-parameters-panel {
+        top: 44px;
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-width: none;
+        max-height: calc(100% - 88px);
+
+        #camera-parameters-selection {
+            grid-template-columns: 1fr;
+        }
+
+        #wan-trajectory-controls {
+            grid-template-columns: 1fr 80px;
+
+            #wan-trajectory-export {
+                grid-column: 1 / -1;
+            }
+        }
+
+        #camera-parameters-preview {
+            min-height: 140px;
+            max-height: 42vh;
+        }
+    }
+}

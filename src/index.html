@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>SuperSplat</title>
+        <meta charset="utf-8" />
+        <base href="__BASE_HREF__">
+        <link rel="manifest" href="./manifest.json">
+        <link rel="shortcut icon" href="#">
+        <meta name="description" content="SuperSplat is an advanced browser-based editor for manipulating and optimizing 3D Gaussian Splats. It is open source and engine agnostic." />
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+
+        <!-- Service worker -->
+        <script>
+            const build = new URLSearchParams(location.search).get('build');
+            const buildQuery = build ? `?build=${encodeURIComponent(build)}` : '';
+            const stylesheet = document.createElement('link');
+            stylesheet.rel = 'stylesheet';
+            stylesheet.href = `./index.css${buildQuery}`;
+            document.head.appendChild(stylesheet);
+
+            const sw = navigator.serviceWorker;
+            if (sw) {
+                let refreshing = false;
+                sw.addEventListener('controllerchange', () => {
+                    if (refreshing) return;
+                    refreshing = true;
+                    location.reload();
+                });
+                sw.register(`./sw.js${buildQuery}`)
+                    .then(reg => console.log('service worker registered', reg))
+                    .catch(err => console.log('failed to register service worker', err));
+            }
+        </script>
+    </head>
+
+    <body>
+        <script type="module">
+            import(`./index.js${buildQuery}`);
+        </script>
+    </body>
+</html>

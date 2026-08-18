@@ -1,0 +1,2 @@
+image_name,width,height,fx,fy,cx,cy,qw_w2c,qx_w2c,qy_w2c,qz_w2c,tx_w2c,ty_w2c,tz_w2c,center_x,center_y,center_z
+smoke.png,640,480,500,500,320,240,1,0,0,0,0,0,0,0,0,0

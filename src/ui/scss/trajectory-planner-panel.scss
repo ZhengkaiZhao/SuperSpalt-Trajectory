@@ -1,0 +1,313 @@
+@use 'colors.scss' as *;
+
+#trajectory-planner-panel {
+    position: absolute;
+    top: 58px;
+    right: 86px;
+    z-index: 31;
+    display: flex;
+    width: 420px;
+    max-width: calc(100% - 110px);
+    max-height: calc(100% - 116px);
+    flex-direction: column;
+    overflow: auto;
+    border: 1px solid $bcg-lighter;
+    border-radius: 6px;
+    background: $bcg-primary;
+    box-shadow: 4px 6px 16px rgba(0, 0, 0, 0.7);
+    pointer-events: all;
+
+    > * {
+        flex-shrink: 0;
+    }
+
+    &.pcui-hidden {
+        display: none;
+    }
+
+    #trajectory-planner-header {
+        display: flex;
+        min-height: 38px;
+        align-items: center;
+        background: $bcg-darker;
+        cursor: grab;
+        touch-action: none;
+
+        #trajectory-planner-title {
+            flex: 1;
+            margin: 0;
+            padding: 0 12px;
+            color: $text-primary;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        #trajectory-planner-close {
+            width: 38px;
+            height: 38px;
+            margin: 0;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            color: $text-secondary;
+            font-size: 20px;
+        }
+    }
+
+    &.dragging #trajectory-planner-header {
+        cursor: grabbing;
+    }
+
+    #trajectory-point-status {
+        margin: 0;
+        padding: 10px 12px;
+        border-bottom: 1px solid $bcg-lighter;
+        color: #ffd65c;
+        line-height: 18px;
+        white-space: normal;
+    }
+
+    #trajectory-switcher {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 88px 88px;
+        gap: 7px;
+        padding: 9px 12px 2px;
+
+        > * {
+            min-width: 0;
+            margin: 0;
+        }
+    }
+
+    .trajectory-grid {
+        display: grid;
+        grid-template-columns: minmax(190px, 1fr) 112px;
+        gap: 8px;
+        padding: 10px 12px;
+
+        > .pcui-label {
+            align-self: center;
+            margin: 0;
+            color: $text-secondary;
+            white-space: normal;
+        }
+
+        > .pcui-numeric-input,
+        > .pcui-boolean-input {
+            min-width: 0;
+        }
+    }
+
+    #trajectory-pose-drop {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 88px;
+        align-items: center;
+        gap: 8px;
+        margin: 0 12px 10px;
+        padding: 9px;
+        border: 1px dashed rgba(105, 170, 255, 0.65);
+        border-radius: 4px;
+        background: rgba(47, 104, 181, 0.09);
+        transition: border-color 120ms, background-color 120ms;
+
+        > .pcui-label {
+            margin: 0;
+            color: $text-secondary;
+            line-height: 16px;
+            white-space: normal;
+        }
+
+        > .pcui-button {
+            height: 30px;
+            margin: 0;
+        }
+
+        &.drag-over,
+        &.reading {
+            border-color: #6fb0ff;
+            background: rgba(47, 104, 181, 0.24);
+        }
+    }
+
+    #real-camera-dataset {
+        display: flex;
+        margin: 0 12px 10px;
+        padding: 9px;
+        flex-direction: column;
+        gap: 8px;
+        border: 1px solid rgba(65, 205, 122, 0.52);
+        border-radius: 4px;
+        background: rgba(36, 130, 76, 0.08);
+
+        &.drag-over,
+        &.reading {
+            border-color: #52dc8c;
+            background: rgba(36, 130, 76, 0.2);
+        }
+
+        #real-camera-dataset-header {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 142px 54px;
+            align-items: center;
+            gap: 7px;
+
+            > * {
+                min-width: 0;
+                margin: 0;
+            }
+
+            > .pcui-label {
+                color: #66e39a;
+                font-weight: 700;
+            }
+        }
+
+        #real-camera-dataset-status {
+            margin: 0;
+            color: $text-secondary;
+            line-height: 16px;
+            white-space: normal;
+        }
+
+        #real-camera-image-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 84px;
+            gap: 7px;
+
+            > * {
+                min-width: 0;
+                margin: 0;
+            }
+        }
+
+        #real-camera-image-preview {
+            display: block;
+            width: 100%;
+            max-height: 180px;
+            border: 1px solid $bcg-lighter;
+            border-radius: 3px;
+            background: #111;
+            object-fit: contain;
+
+            &[hidden] {
+                display: none;
+            }
+        }
+    }
+
+    #trajectory-point-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
+        padding: 2px 12px 10px;
+
+        > .pcui-button {
+            min-width: 0;
+            height: 32px;
+            margin: 0;
+        }
+    }
+
+    #trajectory-planner-status {
+        margin: 0;
+        padding: 9px 12px;
+        border-top: 1px solid $bcg-lighter;
+        color: #72d9a0;
+        line-height: 17px;
+        white-space: normal;
+    }
+
+    #trajectory-planner-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+        padding: 8px 12px 12px;
+
+        > .pcui-button {
+            height: 32px;
+            margin: 0;
+        }
+
+        #trajectory-open-export {
+            color: $text-primary;
+            background: $clr-hilight;
+        }
+    }
+}
+
+#trajectory-preview-controls {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    z-index: 130;
+    display: flex;
+    transform: translateX(-50%);
+    align-items: center;
+    gap: 12px;
+    padding: 7px 8px 7px 14px;
+    border: 1px solid $bcg-lighter;
+    border-radius: 6px;
+    background: rgba(28, 28, 28, 0.94);
+    color: $text-primary;
+
+    &[hidden] {
+        display: none;
+    }
+
+    button {
+        height: 28px;
+        border: 0;
+        border-radius: 4px;
+        padding: 0 12px;
+        background: $clr-hilight;
+        color: $text-primary;
+        cursor: pointer;
+    }
+}
+
+body.trajectory-preview-active {
+    #scene-panel,
+    #right-toolbar,
+    #bottom-toolbar,
+    #mode-toggle,
+    #menu,
+    #trajectory-planner-panel,
+    #camera-parameters-panel,
+    #settings-panel,
+    #color-panel,
+    #timeline-panel,
+    #data-panel {
+        display: none !important;
+    }
+}
+
+@media (max-width: 700px) {
+    #trajectory-planner-panel {
+        top: 82px !important;
+        right: 8px !important;
+        left: 8px !important;
+        width: auto;
+        max-width: none;
+        max-height: calc(100% - 138px);
+
+        .trajectory-grid,
+        #trajectory-switcher,
+        #trajectory-point-actions,
+        #trajectory-planner-actions {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        #trajectory-switcher > .pcui-select-input {
+            grid-column: 1 / -1;
+        }
+
+        #real-camera-dataset #real-camera-dataset-header {
+            grid-template-columns: minmax(0, 1fr) 54px;
+
+            > .pcui-label {
+                grid-column: 1 / -1;
+            }
+        }
+    }
+
+}
