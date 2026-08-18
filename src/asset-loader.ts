@@ -73,7 +73,9 @@ class AssetLoader {
 
             const asset = this.createGSplatAsset(gsplatData, filename);
 
-            return new Splat(asset, transform.rotation);
+            // Skip the default 180-degree rotation from splat-transform library
+            // to load models in their original orientation
+            return new Splat(asset, undefined);
         } finally {
             if (!animationFrame) {
                 this.events.fire('stopSpinner');

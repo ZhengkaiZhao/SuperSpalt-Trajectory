@@ -50,7 +50,8 @@ class PlyFrameSource implements FrameSource {
         validateGSplatData(gsplatData);
 
         const asset = this.scene.assetLoader.createGSplatAsset(gsplatData, file.name);
-        return { asset, rotation: transform.rotation };
+        // Skip default 180-degree rotation to match single-file loading behavior
+        return { asset, rotation: undefined };
     }
 
     destroy() {}
