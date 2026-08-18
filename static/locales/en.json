@@ -319,6 +319,7 @@
     "tooltip.right-toolbar.show-hide": "Show/Hide Splats",
     "tooltip.right-toolbar.orbit-camera": "Orbit Camera",
     "tooltip.right-toolbar.fly-camera": "Fly Camera",
+    "tooltip.right-toolbar.quick-focus": "Click Object to Move",
     "tooltip.right-toolbar.frame-selection": "Frame Selection",
     "tooltip.right-toolbar.reset-camera": "Reset Camera",
     "tooltip.right-toolbar.front-camera": "Level Front View",

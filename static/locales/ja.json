@@ -319,6 +319,7 @@
     "tooltip.right-toolbar.show-hide": "スプラットの表示/非表示",
     "tooltip.right-toolbar.orbit-camera": "オービットカメラ",
     "tooltip.right-toolbar.fly-camera": "フライカメラ",
+    "tooltip.right-toolbar.quick-focus": "オブジェクトをクリックして移動",
     "tooltip.right-toolbar.frame-selection": "選択をフレームイン",
     "tooltip.right-toolbar.reset-camera": "カメラをリセット",
     "tooltip.right-toolbar.front-camera": "水平な正面ビュー",

@@ -47,6 +47,12 @@ const va = new Vec3();
 const m = new Mat4();
 const v4 = new Vec4();
 
+// Stop short of the picked surface so the camera approaches the object
+// without entering the splat volume. The scene damping factor turns 0.75
+// into a short, visible transition (0.15 seconds with the default config).
+const QUICK_FOCUS_DISTANCE_RATIO = 0.3;
+const QUICK_FOCUS_DAMPING_FACTOR = 0.75;
+
 // modulo dealing with negative numbers
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 
@@ -774,6 +780,30 @@ class Camera extends Element {
                 position: result.position
             });
         }
+    }
+
+    // Move toward a visible point and make it the orbit center. Unlike the
+    // normal focal-point picker, this deliberately reduces camera distance.
+    async quickFocusPoint(x: number, y: number) {
+        const result = await this.intersect(x, y);
+        if (!result || !Number.isFinite(result.distance) || result.distance <= 0) {
+            return false;
+        }
+
+        const { scene } = this;
+        const distance = result.distance * QUICK_FOCUS_DISTANCE_RATIO;
+        const normalizedDistance = distance / Math.max(this.sceneRadius, 1e-8) * this.fovFactor;
+
+        scene.events.fire('camera.setControlMode', 'orbit');
+        this.setFocalPoint(result.position, QUICK_FOCUS_DAMPING_FACTOR);
+        this.setDistance(normalizedDistance, QUICK_FOCUS_DAMPING_FACTOR);
+        scene.events.fire('camera.quickFocusPicked', {
+            camera: this,
+            splat: result.splat,
+            position: result.position
+        });
+
+        return true;
     }
 
     // pick mode

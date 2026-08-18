@@ -319,6 +319,7 @@
     "tooltip.right-toolbar.show-hide": "Afficher/cacher les splats",
     "tooltip.right-toolbar.orbit-camera": "Caméra orbitale",
     "tooltip.right-toolbar.fly-camera": "Caméra de vol",
+    "tooltip.right-toolbar.quick-focus": "Cliquer sur un objet pour s'en approcher",
     "tooltip.right-toolbar.frame-selection": "Cadrer la sélection",
     "tooltip.right-toolbar.reset-camera": "Réinitialiser la caméra",
     "tooltip.right-toolbar.front-camera": "Vue de face horizontale",

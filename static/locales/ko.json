@@ -319,6 +319,7 @@
     "tooltip.right-toolbar.show-hide": "스플래츠 표시/숨기기",
     "tooltip.right-toolbar.orbit-camera": "오빗 카메라",
     "tooltip.right-toolbar.fly-camera": "플라이 카메라",
+    "tooltip.right-toolbar.quick-focus": "오브젝트를 클릭하여 이동",
     "tooltip.right-toolbar.frame-selection": "프레임 선택",
     "tooltip.right-toolbar.reset-camera": "카메라 재설정",
     "tooltip.right-toolbar.front-camera": "수평 정면 뷰",
