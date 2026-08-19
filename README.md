@@ -12,7 +12,7 @@
 
 NVIDIA/RTX 用户可以双击 [`SuperSplat RTX.cmd`](SuperSplat%20RTX.cmd)。该入口使用独立 Chrome 配置和高性能 GPU 参数，且不包含任何固定用户目录。
 
-首次启动会按 `package-lock.json` 安装依赖并生成 release 构建，所需时间取决于网络和机器性能。后续启动会复用依赖、校验和构建缓存；RTX 启动器还会直接唤醒相同构建的已有窗口，不再重复关闭和启动 Chrome。需要主动重启 RTX 浏览器进程时运行 `SuperSplat RTX.cmd -Restart`。
+首次启动会按 `package-lock.json` 安装依赖并生成 release 构建，所需时间取决于网络和机器性能。后续启动会复用依赖、校验和构建缓存；RTX 启动器还会直接唤醒相同构建的已有窗口，不再重复关闭和启动 Chrome。关闭 RTX 网页窗口后，专用 Chrome、生命周期监视器和 3011 本地服务会自动退出；普通 Chrome 不受影响。需要主动重启 RTX 浏览器进程时运行 `SuperSplat RTX.cmd -Restart`。
 
 依赖或构建异常时执行完整修复：
 

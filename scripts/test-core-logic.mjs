@@ -138,6 +138,8 @@ const blitShaderSource = await readFile(new URL('../src/shaders/blit-shader.ts',
 const renderSource = await readFile(new URL('../src/render.ts', import.meta.url), 'utf8');
 const cameraParametersPanelSource = await readFile(new URL('../src/ui/camera-parameters-panel.ts', import.meta.url), 'utf8');
 const imageSettingsDialogSource = await readFile(new URL('../src/ui/image-settings-dialog.ts', import.meta.url), 'utf8');
+const rtxLauncherSource = await readFile(new URL('./launch-rtx.ps1', import.meta.url), 'utf8');
+const rtxWatcherSource = await readFile(new URL('./watch-rtx-lifecycle.ps1', import.meta.url), 'utf8');
 const modelLoadSource = `${assetLoaderSource}\n${sequenceSource}`;
 assert.doesNotMatch(
     splatSerializeSource,
@@ -193,6 +195,16 @@ assert.match(
     renderSource,
     /width > maxTextureSize \|\| height > maxTextureSize/,
     'image rendering must reject dimensions above the GPU texture limit'
+);
+assert.match(
+    rtxLauncherSource,
+    /watch-rtx-lifecycle\.ps1[\s\S]*function Start-LifecycleWatcher[\s\S]*serverProcessId/i,
+    'the RTX launcher must bind its app window to the local server lifecycle'
+);
+assert.match(
+    rtxWatcherSource,
+    /MainWindowHandle[\s\S]*scripts\\start-local\.mjs[\s\S]*--port=3011[\s\S]*Stop-Process/,
+    'the RTX lifecycle watcher must verify its window and server before cleanup'
 );
 
 console.log('Core logic checks passed');

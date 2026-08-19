@@ -33,7 +33,7 @@ macOS 启动器执行相同的版本判断，并可通过 Homebrew 安装或升�
 6. 按需构建：仅在 `dist/` 缺失、源码较新或指定强制构建时运行 Rollup。
 7. 启动服务：仅监听 `127.0.0.1`，从首选端口开始寻找可用端口。
 
-RTX 双击启动器会在首次缺少 `node_modules/.package-lock.json` 或 `dist/index.js` 时同步完成上述准备，让依赖下载不受后台服务等待时间限制。准备完成后，普通缓存命中只执行轻量状态检查；相同 release 构建的 RTX 窗口会被直接恢复和置顶。`SuperSplat RTX.cmd -Restart` 可在需要时强制重启专用 Chrome。
+RTX 双击启动器会在首次缺少 `node_modules/.package-lock.json` 或 `dist/index.js` 时同步完成上述准备，让依赖下载不受后台服务等待时间限制。准备完成后，普通缓存命中只执行轻量状态检查；相同 release 构建的 RTX 窗口会被直接恢复和置顶。启动器记录专用窗口、生命周期监视器和本地服务 PID；关闭网页窗口时，监视器在核验 Chrome 配置目录和 `start-local.mjs --port=3011 --strict-port` 命令行后停止对应进程。`SuperSplat RTX.cmd -Restart` 会先交接监视器，可在不停止本地服务的情况下强制重启专用 Chrome。
 
 `npm ci` 会先重建 `node_modules`，再严格安装锁文件中的版本。它不会像 `npm update` 一样选择新版本，也不会修改 `package.json` 或 `package-lock.json`。项目当前包含 36 个直接开发依赖、538 个锁定包（包含传递依赖），锁文件格式为 v3。
 
