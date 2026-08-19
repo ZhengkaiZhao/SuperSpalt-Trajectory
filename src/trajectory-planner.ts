@@ -686,8 +686,7 @@ const registerTrajectoryPlannerEvents = (scene: Scene, events: Events) => {
             fov?: number
         }[] | undefined) ?? []);
         // The original COLMAP sequence is authoritative for the path's travel
-        // direction. Image preview orientation (including camera.flipY) is only
-        // a display concern and must not choose or reverse the virtual path.
+        // direction. Image presentation must not choose or reverse the path.
         const trackPoses = colmapPoses.length >= 2 ? colmapPoses : timelinePoses;
         if (trackPoses.length >= 2 && generatedPlanFingerprint === null) {
             referenceCameraPositions = trackPoses.map(pose => pose.position.clone());

@@ -319,11 +319,9 @@
     "tooltip.right-toolbar.show-hide": "Показать/Скрыть сплаты",
     "tooltip.right-toolbar.orbit-camera": "Орбитальная камера",
     "tooltip.right-toolbar.fly-camera": "Камера полёта",
-    "tooltip.right-toolbar.quick-focus": "Щёлкните объект для перемещения",
     "tooltip.right-toolbar.frame-selection": "Обрамить выделение",
     "tooltip.right-toolbar.reset-camera": "Сбросить камеру",
     "tooltip.right-toolbar.front-camera": "Ровный вид спереди",
-    "tooltip.right-toolbar.flip-y": "Отразить вид по вертикали",
     "tooltip.right-toolbar.colors": "Цвета",
     "tooltip.right-toolbar.settings": "Настройки",
 

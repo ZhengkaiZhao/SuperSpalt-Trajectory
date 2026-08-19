@@ -384,11 +384,6 @@ body {
     padding: 0;
     margin: 0;
     flex-grow: 1;
-
-    &.quick-focus-active,
-    &.quick-focus-active #canvas {
-        cursor: crosshair;
-    }
 }
 
 #tools-container {

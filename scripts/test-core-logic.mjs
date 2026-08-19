@@ -19,6 +19,7 @@ const projectDocument = await importTypeScript(new URL('../src/project-document.
 const ranking = await importTypeScript(new URL('../src/image-pose-match-ranking.ts', import.meta.url));
 const posePresentation = await importTypeScript(new URL('../src/colmap-pose-presentation.ts', import.meta.url));
 const rotationSearch = await importTypeScript(new URL('../src/image-pose-rotation-search.ts', import.meta.url));
+const trajectoryFormat = await importTypeScript(new URL('../src/trajectory-export-format.ts', import.meta.url));
 
 const validProject = {
     splats: [{
@@ -97,5 +98,101 @@ for (let angle = -175; angle <= 180; angle += rotationSearch.rotationStepDegrees
     });
     assert.ok(rotationSearch.refinedRotationAngles(nearestCoarse).includes(angle));
 }
+
+const trajectoryRows = [{
+    index: 1,
+    image_name: 'Virtual_Cam_000001.png',
+    qw_w2c: 1,
+    qx_w2c: 0,
+    qy_w2c: 0,
+    qz_w2c: 0,
+    tx_w2c: 1,
+    ty_w2c: 2,
+    tz_w2c: 3
+}, {
+    index: 2,
+    image_name: 'Virtual_Cam_000002.png',
+    qw_w2c: -1,
+    qx_w2c: 0,
+    qy_w2c: 0,
+    qz_w2c: 0,
+    tx_w2c: 4,
+    ty_w2c: 5,
+    tz_w2c: 6
+}];
+const trajectoryCsv = trajectoryFormat.colmapW2cRowsToCsv(trajectoryRows);
+assert.match(trajectoryCsv, /^index,image_name,qw_w2c/);
+assert.match(trajectoryCsv, /2,Virtual_Cam_000002\.png,1,0,0,0,4,5,6/);
+const trajectoryTxt = trajectoryFormat.colmapW2cRowsToImagesText(trajectoryRows);
+assert.match(trajectoryTxt, /# Number of images: 2/);
+assert.match(trajectoryTxt, /1 1 0 0 0 1 2 3 1 Virtual_Cam_000001\.png\n\n/);
+assert.match(trajectoryTxt, /2 1 0 0 0 4 5 6 1 Virtual_Cam_000002\.png\n$/);
+assert.throws(() => trajectoryFormat.colmapW2cRowsToImagesText(trajectoryRows, 0), /positive integer/);
+
+const assetLoaderSource = await readFile(new URL('../src/asset-loader.ts', import.meta.url), 'utf8');
+const sequenceSource = await readFile(new URL('../src/sequence.ts', import.meta.url), 'utf8');
+const splatSerializeSource = await readFile(new URL('../src/splat-serialize.ts', import.meta.url), 'utf8');
+const cameraSource = await readFile(new URL('../src/camera.ts', import.meta.url), 'utf8');
+const rightToolbarSource = await readFile(new URL('../src/ui/right-toolbar.ts', import.meta.url), 'utf8');
+const blitShaderSource = await readFile(new URL('../src/shaders/blit-shader.ts', import.meta.url), 'utf8');
+const renderSource = await readFile(new URL('../src/render.ts', import.meta.url), 'utf8');
+const cameraParametersPanelSource = await readFile(new URL('../src/ui/camera-parameters-panel.ts', import.meta.url), 'utf8');
+const imageSettingsDialogSource = await readFile(new URL('../src/ui/image-settings-dialog.ts', import.meta.url), 'utf8');
+const modelLoadSource = `${assetLoaderSource}\n${sequenceSource}`;
+assert.doesNotMatch(
+    splatSerializeSource,
+    /setFromEulerAngles\(\s*0\s*,\s*0\s*,\s*-?180\s*\)/,
+    'splat serialization must not apply a hidden 180-degree Z rotation'
+);
+assert.doesNotMatch(
+    modelLoadSource,
+    /new Splat\([^\n]*transform\.rotation/,
+    'model loading must not apply the splat-transform PLY display rotation'
+);
+assert.match(
+    splatSerializeSource,
+    /mat\.copy\(splat\.entity\.getWorldTransform\(\)\)/,
+    'standalone splat exports must bake only the entity world transform'
+);
+assert.doesNotMatch(
+    `${cameraSource}\n${rightToolbarSource}`,
+    /camera-flip-y|toggleFlipY|setFlipY|camera\.flipY/,
+    'camera presentation orientation must not be user-switchable'
+);
+assert.match(
+    blitShaderSource,
+    /1\.0\s*-\s*texCoord\.y/,
+    'the final WebGPU presentation must apply exactly one fixed Y inversion'
+);
+assert.match(
+    cameraSource,
+    /pickSplatSurfacePoint/,
+    'camera focus must use the CPU surface picker'
+);
+assert.doesNotMatch(
+    cameraSource,
+    /picker\.(?:prepareDepth|readDepth)/,
+    'camera focus must not run GPU-sort depth picking and synchronous texture readback'
+);
+assert.match(
+    cameraParametersPanelSource,
+    /id: 'output-image-size-preset'[\s\S]*id: 'output-image-width'[\s\S]*id: 'output-image-height'/,
+    'trajectory image export must expose preset and custom PNG dimensions'
+);
+assert.match(
+    cameraParametersPanelSource,
+    /events\.invoke\('targetSize'\)[\s\S]*events\.invoke\('render\.maxTextureSize'\)/,
+    'trajectory output dimensions must expose the current render size and GPU limit'
+);
+assert.match(
+    imageSettingsDialogSource,
+    /resolution\.current'\)} \(\$\{targetSize\.width\} x \$\{targetSize\.height\}\)/,
+    'single-image current-size preset must show its exact pixel dimensions'
+);
+assert.match(
+    renderSource,
+    /width > maxTextureSize \|\| height > maxTextureSize/,
+    'image rendering must reject dimensions above the GPU texture limit'
+);
 
 console.log('Core logic checks passed');

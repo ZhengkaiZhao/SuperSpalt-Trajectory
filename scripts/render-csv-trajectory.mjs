@@ -916,23 +916,17 @@ const main = async () => {
                         text: element.textContent?.trim()
                     } : null];
                 }));
-                const flipButton = document.getElementById('right-toolbar-camera-flip-y');
-                const flipState = () => ({
-                    camera: window.scene.camera.flipY,
-                    active: flipButton?.classList.contains('active') ?? false,
-                    pressed: flipButton?.getAttribute('aria-pressed')
-                });
-                const initial = flipState();
-                window.scene.events.fire('camera.toggleFlipY');
-                const inverted = flipState();
-                window.scene.events.fire('camera.toggleFlipY');
-                return { ...layout, flipY: { initial, inverted, restored: flipState() } };
+                return {
+                    ...layout,
+                    fixedPresentation: {
+                        flipButtonPresent: document.getElementById('right-toolbar-camera-flip-y') !== null,
+                        mutableCameraFlipPresent: 'flipY' in window.scene.camera || 'setFlipY' in window.scene.camera
+                    }
+                };
             })()`);
-            const expectedFlipStates = layout.flipY?.initial?.camera === true &&
-                layout.flipY.initial.active === false && layout.flipY.initial.pressed === 'false' &&
-                layout.flipY.inverted.camera === false && layout.flipY.inverted.active === true &&
-                layout.flipY.inverted.pressed === 'true' && layout.flipY.restored.camera === true;
-            if (!expectedFlipStates) throw new Error(`Camera Y-axis toggle verification failed: ${JSON.stringify(layout.flipY)}`);
+            if (layout.fixedPresentation?.flipButtonPresent || layout.fixedPresentation?.mutableCameraFlipPresent) {
+                throw new Error(`Camera presentation orientation is unexpectedly mutable: ${JSON.stringify(layout.fixedPresentation)}`);
+            }
             const screenshot = await client.send('Page.captureScreenshot', {
                 format: 'png', fromSurface: true, captureBeyondViewport: false
             });

@@ -314,6 +314,13 @@ const registerRenderEvents = (scene: Scene, events: Events) => {
 
         try {
             const { width, height, transparentBg, showDebug, format, quality, projection, levelHorizon } = imageSettings;
+            const maxTextureSize = scene.graphicsDevice.maxTextureSize;
+            if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1) {
+                throw new Error('图片宽度和高度必须是正整数');
+            }
+            if (width > maxTextureSize || height > maxTextureSize) {
+                throw new Error(`当前 GPU 最大支持 ${maxTextureSize} x ${maxTextureSize}`);
+            }
             const is360 = projection === 'equirect';
             const currentPose = events.invoke('camera.getPose') as {
                 position: { x: number, y: number, z: number },
@@ -617,6 +624,8 @@ const registerRenderEvents = (scene: Scene, events: Events) => {
                 if (scene.canvas.width !== width || scene.canvas.height !== height) {
                     throw new Error(`渲染画布尺寸为 ${scene.canvas.width} x ${scene.canvas.height}，应为 ${width} x ${height}`);
                 }
+                // The presentation pass has one fixed WebGPU Y inversion, so
+                // drawImage yields canonical top-left PNG rows on every export.
                 captureContext.clearRect(0, 0, width, height);
                 captureContext.drawImage(scene.canvas, 0, 0, width, height);
                 const rgba = new Uint8Array(captureContext.getImageData(0, 0, width, height).data);
@@ -658,6 +667,11 @@ const registerRenderEvents = (scene: Scene, events: Events) => {
                 images: imageNames,
                 colmap_w2c_pose_file: poseFilename,
                 colmap_w2c_convention: 'X_camera = R_w2c * X_world + t_w2c; quaternion order w,x,y,z',
+                pixel_convention: {
+                    origin: 'top-left',
+                    orientation: 'upright',
+                    user_mirroring: false
+                },
                 cameras: poses.slice(0, imageNames.length).map((pose, index) => ({
                     index: index + 1,
                     image_name: imageNames[index],

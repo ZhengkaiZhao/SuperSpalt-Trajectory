@@ -15,13 +15,11 @@ class PointerController {
     destroy: () => void;
 
     constructor(camera: Camera, target: HTMLElement) {
-        const events = camera.scene.events;
 
-        // flipY mirrors only the final displayed image. Convert display-space
-        // vertical input back to render space so orbit, look and pan retain
-        // exactly the same physical mouse direction in both display modes.
-        const renderY = (value: number) => (camera.flipY ? target.clientHeight - value : value);
-        const renderDeltaY = (value: number) => (camera.flipY ? -value : value);
+        // The WebGPU presentation has one fixed Y inversion. Convert pointer
+        // input back to render coordinates so navigation matches the display.
+        const renderY = (value: number) => target.clientHeight - value;
+        const renderDeltaY = (value: number) => -value;
 
         // Orbit mode: rotate camera around the focal point
         const orbit = (dx: number, dy: number) => {
@@ -63,51 +61,11 @@ class PointerController {
         const CLICK_DRAG_THRESHOLD = 4;
         let mmbStartX = 0, mmbStartY = 0, mmbDragged = false;
 
-        // One-shot quick-focus mode. A short drag is ignored so activating the
-        // tool cannot accidentally orbit and navigate at the same time.
-        let quickFocusActive = false;
-        let quickFocusBusy = false;
-        let quickFocusPointerId = -1;
-        let quickFocusStartX = 0;
-        let quickFocusStartY = 0;
-        let quickFocusDragged = false;
-        let quickFocusGeneration = 0;
-
-        const setQuickFocusActive = (active: boolean) => {
-            if (quickFocusActive === active) return;
-
-            quickFocusActive = active;
-            quickFocusGeneration++;
-            if (quickFocusPointerId !== -1 && target.hasPointerCapture(quickFocusPointerId)) {
-                target.releasePointerCapture(quickFocusPointerId);
-            }
-            quickFocusPointerId = -1;
-            target.classList.toggle('quick-focus-active', active);
-            events.fire('camera.quickFocus.active', active);
-
-            if (active) {
-                events.fire('tool.deactivate');
-            }
-        };
-
         // touch state
         let touches: { id: number, x: number, y: number}[] = [];
         let midx: number, midy: number, midlen: number;
 
         const pointerdown = (event: PointerEvent) => {
-            if (quickFocusActive && event.isPrimary && event.button === 0) {
-                if (!quickFocusBusy) {
-                    target.setPointerCapture(event.pointerId);
-                    quickFocusPointerId = event.pointerId;
-                    quickFocusStartX = event.clientX;
-                    quickFocusStartY = event.clientY;
-                    quickFocusDragged = false;
-                }
-                event.preventDefault();
-                event.stopPropagation();
-                return;
-            }
-
             if (event.pointerType === 'mouse') {
                 // If a button is already pressed, ignore this press
                 if (pressedButton !== -1) {
@@ -141,35 +99,6 @@ class PointerController {
         };
 
         const pointerup = (event: PointerEvent) => {
-            if (event.pointerId === quickFocusPointerId) {
-                const requestGeneration = quickFocusGeneration;
-                const shouldPick = !quickFocusDragged && quickFocusActive && !quickFocusBusy;
-                quickFocusPointerId = -1;
-                if (target.hasPointerCapture(event.pointerId)) {
-                    target.releasePointerCapture(event.pointerId);
-                }
-
-                if (shouldPick) {
-                    const rect = target.getBoundingClientRect();
-                    const normalizedX = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-                    const normalizedY = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
-                    quickFocusBusy = true;
-                    camera.quickFocusPoint(normalizedX, normalizedY).then((picked) => {
-                        if (picked && quickFocusActive && requestGeneration === quickFocusGeneration) {
-                            setQuickFocusActive(false);
-                        }
-                    }).catch((error) => {
-                        console.warn('Quick focus depth pick failed', error);
-                    }).finally(() => {
-                        quickFocusBusy = false;
-                    });
-                }
-
-                event.preventDefault();
-                event.stopPropagation();
-                return;
-            }
-
             if (event.pointerType === 'mouse') {
                 // Only release if this is the button that was initially pressed
                 if (event.button === pressedButton) {
@@ -188,33 +117,7 @@ class PointerController {
             }
         };
 
-        const pointercancel = (event: PointerEvent) => {
-            if (event.pointerId === quickFocusPointerId) {
-                quickFocusPointerId = -1;
-                if (target.hasPointerCapture(event.pointerId)) {
-                    target.releasePointerCapture(event.pointerId);
-                }
-                event.preventDefault();
-                return;
-            }
-
-            if (event.pointerType === 'mouse') {
-                pressedButton = -1;
-            } else {
-                touches = touches.filter(touch => touch.id !== event.pointerId);
-            }
-        };
-
         const pointermove = (event: PointerEvent) => {
-            if (event.pointerId === quickFocusPointerId) {
-                if (dist(event.clientX, event.clientY, quickFocusStartX, quickFocusStartY) >= CLICK_DRAG_THRESHOLD) {
-                    quickFocusDragged = true;
-                }
-                event.preventDefault();
-                event.stopPropagation();
-                return;
-            }
-
             if (event.pointerType === 'mouse') {
                 // Only process if we're tracking a button
                 if (pressedButton === -1) {
@@ -351,10 +254,6 @@ class PointerController {
         let ctrlDown = false;
         const keydown = (event: KeyboardEvent) => {
             if (event.key === 'Control') ctrlDown = true;
-            if (event.key === 'Escape' && quickFocusActive) {
-                setQuickFocusActive(false);
-                event.preventDefault();
-            }
         };
         const keyup = (event: KeyboardEvent) => {
             if (event.key === 'Control') ctrlDown = false;
@@ -411,10 +310,6 @@ class PointerController {
         const canvas = camera.scene.app.graphicsDevice.canvas;
 
         const dblclick = (event: globalThis.MouseEvent) => {
-            if (quickFocusActive || quickFocusBusy) {
-                event.preventDefault();
-                return;
-            }
             if (event.target === target || event.target === canvas) {
                 // Switch to orbit mode when double-clicking to focus
                 if (camera.controlMode === 'fly') {
@@ -457,6 +352,7 @@ class PointerController {
         };
 
         // Listen for fly movement shortcut events
+        const events = camera.scene.events;
 
         const onFlyForward = (down: boolean) => {
             flyForward = down;
@@ -488,14 +384,6 @@ class PointerController {
         const onModifierSlow = (down: boolean) => {
             slowDown = down;
         };
-        const onQuickFocusToggle = () => {
-            setQuickFocusActive(!quickFocusActive);
-        };
-        const onToolActivated = (toolName: string | null) => {
-            if (toolName && quickFocusActive) {
-                setQuickFocusActive(false);
-            }
-        };
 
         events.on('camera.fly.forward', onFlyForward);
         events.on('camera.fly.backward', onFlyBackward);
@@ -505,8 +393,6 @@ class PointerController {
         events.on('camera.fly.up', onFlyUp);
         events.on('camera.modifier.fast', onModifierFast);
         events.on('camera.modifier.slow', onModifierSlow);
-        events.on('camera.quickFocus.toggle', onQuickFocusToggle);
-        events.on('tool.activated', onToolActivated);
 
         this.update = (deltaTime: number) => {
             if (camera.controlMode !== 'fly') return;
@@ -515,7 +401,7 @@ class PointerController {
             const forward = (flyForward ? 1 : 0) - (flyBackward ? 1 : 0);
             const strafe = (flyRight ? 1 : 0) - (flyLeft ? 1 : 0);
             const displayVertical = (flyUp ? 1 : 0) - (flyDown ? 1 : 0);
-            const vertical = camera.flipY ? -displayVertical : displayVertical;
+            const vertical = -displayVertical;
 
             if (forward || strafe || vertical) {
                 // Calculate speed modifier based on current modifier key state
@@ -568,7 +454,6 @@ class PointerController {
 
         wrap(target, 'pointerdown', pointerdown);
         wrap(target, 'pointerup', pointerup);
-        wrap(target, 'pointercancel', pointercancel);
         wrap(target, 'pointermove', pointermove);
         wrap(target, 'wheel', wheel, { passive: false });
         wrap(target, 'dblclick', dblclick);
@@ -595,9 +480,6 @@ class PointerController {
             events.off('camera.fly.up', onFlyUp);
             events.off('camera.modifier.fast', onModifierFast);
             events.off('camera.modifier.slow', onModifierSlow);
-            events.off('camera.quickFocus.toggle', onQuickFocusToggle);
-            events.off('tool.activated', onToolActivated);
-            target.classList.remove('quick-focus-active');
         };
     }
 }

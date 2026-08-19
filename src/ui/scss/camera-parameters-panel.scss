@@ -117,6 +117,7 @@
         }
     }
 
+    #output-image-size-title,
     #wan-trajectory-title {
         flex: 0 0 auto;
         margin: 0;
@@ -127,10 +128,55 @@
         font-weight: 600;
     }
 
+    #output-image-size-controls {
+        display: grid;
+        flex: 0 0 auto;
+        grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+        padding: 4px 12px 7px;
+
+        > .pcui-label {
+            margin: 0;
+            color: $text-secondary;
+            white-space: nowrap;
+        }
+
+        > .pcui-numeric-input,
+        #output-image-size-preset {
+            min-width: 0;
+        }
+
+        #output-image-size-preset {
+            grid-column: 2 / -1;
+        }
+
+        #output-image-use-current {
+            grid-column: 1 / -1;
+            height: 30px;
+            margin: 0;
+            color: $text-primary;
+            background-color: $bcg-dark;
+        }
+    }
+
+    #output-image-size-status {
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 0 12px 8px;
+        color: $text-secondary;
+        font-size: 11px;
+        line-height: 16px;
+
+        &[data-state='error'] {
+            color: #ff8c8c;
+        }
+    }
+
     #wan-trajectory-controls {
         display: grid;
         flex: 0 0 auto;
-        grid-template-columns: auto 76px auto 76px;
+        grid-template-columns: auto 90px;
         gap: 8px;
         align-items: center;
         padding: 4px 12px 8px;
@@ -143,14 +189,6 @@
 
         > .pcui-numeric-input {
             min-width: 0;
-        }
-
-        > :nth-child(5) {
-            grid-column: 1;
-        }
-
-        > :nth-child(6) {
-            grid-column: 2;
         }
 
         #wan-trajectory-export {
@@ -211,6 +249,16 @@
         padding: 0 12px 8px;
         color: $text-secondary;
         font-size: 11px;
+    }
+
+    #trajectory-file-actions {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+
+        > .pcui-button {
+            min-width: 0;
+            padding: 0 4px;
+        }
     }
 
     #trajectory-image-status {
@@ -280,6 +328,18 @@
             grid-template-columns: 1fr 80px;
 
             #wan-trajectory-export {
+                grid-column: 1 / -1;
+            }
+        }
+
+        #output-image-size-controls {
+            grid-template-columns: auto minmax(0, 1fr);
+
+            #output-image-size-preset {
+                grid-column: 2;
+            }
+
+            #output-image-use-current {
                 grid-column: 1 / -1;
             }
         }

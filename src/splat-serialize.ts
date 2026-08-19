@@ -282,10 +282,10 @@ class SplatTransformCache {
             if (!transform.mat) {
                 const mat = new Mat4();
 
-                // we must undo the transform we apply at load time to output data
+                // Bake the entity's actual world transform into standalone exports.
+                // Project documents keep this transform separately in document.json.
                 if (!keepWorldTransform) {
-                    mat.setFromEulerAngles(0, 0, -180);
-                    mat.mul2(mat, splat.entity.getWorldTransform());
+                    mat.copy(splat.entity.getWorldTransform());
                 }
 
                 // combine with transform palette matrix
@@ -529,9 +529,9 @@ const buildLayouts = (numRest: number): Partial<Record<ChunkLayer, LayerLayout>>
  * It is the streaming analog of the old extractDataTable/DataTable path:
  * gaussians are filtered
  * (deleted/selection/opacity/invalid) and transformed (world + palette + SH
- * rotation + colour tint + PLY-space flip) on demand via SingleSplat, one chunk
- * at a time. The output is in PLY space, so the source is tagged Transform.PLY
- * (identity) and the writers' bakeTransform is a no-op.
+ * rotation + colour tint) on demand via SingleSplat, one chunk at a time. The
+ * coordinates already match the PLY records, so tagging the source Transform.PLY
+ * makes the writers' bakeTransform a no-op; it does not rotate the data.
  */
 class SuperSplatChunkSource implements ChunkSource {
     meta: ChunkSourceMetadata;

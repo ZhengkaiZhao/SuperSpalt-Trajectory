@@ -192,6 +192,9 @@ class Splat extends Element {
         if (rotation) {
             this._name = (asset.file as any).filename;
             this.entity.setLocalRotation(rotation);
+        } else if (rotation === undefined) {
+            // Initial load without rotation - set name but keep identity rotation
+            this._name = (asset.file as any).filename;
         }
 
         // added per-splat state channel

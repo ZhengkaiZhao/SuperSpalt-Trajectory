@@ -34,6 +34,7 @@ import { Picker } from './picker';
 import { Serializer } from './serializer';
 import { vertexShader, fragmentShader } from './shaders/blit-shader';
 import { Splat } from './splat';
+import { pickSplatSurfacePoint } from './splat-pick';
 import { TweenValue } from './tween-value';
 import { ShaderQuad, SimpleRenderPass } from './utils/simple-render-pass';
 
@@ -44,13 +45,10 @@ const ray = new Ray();
 const vec = new Vec3();
 const vecb = new Vec3();
 const va = new Vec3();
+const pickLocal = new Vec3();
+const pickWorld = new Vec3();
 const m = new Mat4();
 const v4 = new Vec4();
-
-// Quick focus moves the camera to a comfortable viewing distance based on
-// scene size, similar to frame-selection but triggered by clicking a point.
-// The damping factor creates a short, visible transition (~0.15 seconds).
-const QUICK_FOCUS_DAMPING_FACTOR = 0.75;
 
 // modulo dealing with negative numbers
 const mod = (n: number, m: number) => ((n % m) + m) % m;
@@ -120,11 +118,6 @@ class Camera extends Element {
     displayTransform = new Mat4();
 
     renderOverlays = true;
-
-    // The WebGPU render target is vertically opposite to the user-facing view,
-    // so the corrected presentation is the default. The toolbar highlights
-    // only when the user switches away from this baseline to an inverted view.
-    flipY = true;
 
     updateCameraUniforms: () => void;
 
@@ -310,8 +303,8 @@ class Camera extends Element {
         m.transformVec4(v4, v4);
 
         screen.x = v4.x / v4.w * 0.5 + 0.5;
-        screen.y = 1.0 - (v4.y / v4.w * 0.5 + 0.5);
-        if (this.flipY) screen.y = 1 - screen.y;
+        // The final WebGPU presentation pass has one fixed Y inversion.
+        screen.y = v4.y / v4.w * 0.5 + 0.5;
         screen.z = v4.z / v4.w;
     }
 
@@ -345,8 +338,7 @@ class Camera extends Element {
             new ShaderQuad(device, vertexShader, fragmentShader, 'final-blit'), {
                 vars: () => {
                     return {
-                        srcTexture: this.mainTarget.colorBuffer,
-                        flipY: this.flipY ? 1 : 0
+                        srcTexture: this.mainTarget.colorBuffer
                     };
                 }
             });
@@ -701,9 +693,8 @@ class Camera extends Element {
     getRay(screenX: number, screenY: number, ray: Ray) {
         const { camera, ortho } = this;
         const cameraPos = this.mainCamera.getPosition();
-        if (this.flipY) {
-            screenY = this.scene.canvas.clientHeight - screenY;
-        }
+        // Convert from the fixed presentation coordinates to render coordinates.
+        screenY = this.scene.canvas.clientHeight - screenY;
 
         // create the pick ray in world space
         if (ortho) {
@@ -718,26 +709,33 @@ class Camera extends Element {
         }
     }
 
-    // intersect the scene at the given normalized screen coordinate (0-1 range) using depth picking
-    async intersect(x: number, y: number) {
+    // Intersect visible Gaussian centers on the CPU. Running RenderPassPicker
+    // while the scene uses WebGPU GPU-sort can hang the D3D12 device during the
+    // synchronous texture readback, leaving the editor permanently black.
+    intersect(x: number, y: number) {
         const { scene } = this;
         const splats = scene.getElementsByType(ElementType.splat);
-        const renderY = this.flipY ? 1 - y : y;
+        const screenX = x * scene.canvas.clientWidth;
+        const screenY = y * scene.canvas.clientHeight;
+        this.getRay(screenX, screenY, ray);
 
-        let closestDepth = Infinity;
+        let closestDistance = Infinity;
         let closestSplat: Splat | null = null;
+        const closestPosition = new Vec3();
 
-        // Find the splat with the smallest depth at this screen position
+        // Each splat returns its dominant visible surface on the click ray.
         for (let i = 0; i < splats.length; ++i) {
             const splat = splats[i] as Splat;
             if (!splat.visible || splat.numSplats === 0) continue;
 
-            this.picker.prepareDepth(splat);
-            const normalizedDepth = await this.picker.readDepth(x, renderY);
+            if (!pickSplatSurfacePoint(scene, splat, screenX, screenY, pickLocal)) continue;
 
-            if (normalizedDepth !== null && normalizedDepth < closestDepth) {
-                closestDepth = normalizedDepth;
+            splat.worldTransform.transformPoint(pickLocal, pickWorld);
+            const distance = vec.sub2(pickWorld, ray.origin).dot(ray.direction);
+            if (Number.isFinite(distance) && distance > 0 && distance < closestDistance) {
+                closestDistance = distance;
                 closestSplat = splat;
+                closestPosition.copy(pickWorld);
             }
         }
 
@@ -745,23 +743,10 @@ class Camera extends Element {
             return null;
         }
 
-        // Convert normalized depth to linear depth
-        const linearDepth = closestDepth * (this.far - this.near) + this.near;
-
-        // Convert normalized coordinates to screen pixels for getRay
-        const screenX = x * scene.canvas.clientWidth;
-        const screenY = y * scene.canvas.clientHeight;
-
-        // Calculate world position from ray and depth
-        this.getRay(screenX, screenY, ray);
-        const t = linearDepth / ray.direction.dot(this.mainCamera.forward);
-        const position = new Vec3();
-        position.copy(ray.origin).add(vec.copy(ray.direction).mulScalar(t));
-
         return {
             splat: closestSplat,
-            position: position,
-            distance: t
+            position: closestPosition,
+            distance: closestDistance
         };
     }
 
@@ -779,32 +764,6 @@ class Camera extends Element {
                 position: result.position
             });
         }
-    }
-
-    // Move toward a visible point and make it the orbit center. Sets a
-    // comfortable viewing distance based on scene size, not the pick distance.
-    async quickFocusPoint(x: number, y: number) {
-        const result = await this.intersect(x, y);
-        if (!result || !Number.isFinite(result.distance) || result.distance <= 0) {
-            return false;
-        }
-
-        const { scene } = this;
-
-        // Use a fixed comfortable viewing distance relative to scene size,
-        // similar to frame-selection, rather than basing it on pick depth
-        const comfortableDistance = 1.5;
-
-        scene.events.fire('camera.setControlMode', 'orbit');
-        this.setFocalPoint(result.position, QUICK_FOCUS_DAMPING_FACTOR);
-        this.setDistance(comfortableDistance, QUICK_FOCUS_DAMPING_FACTOR);
-        scene.events.fire('camera.quickFocusPicked', {
-            camera: this,
-            splat: result.splat,
-            position: result.position
-        });
-
-        return true;
     }
 
     // pick mode
@@ -865,14 +824,6 @@ class Camera extends Element {
 
     get camera() {
         return this.mainCamera.camera;
-    }
-
-    setFlipY(value: boolean) {
-        if (value !== this.flipY) {
-            this.flipY = value;
-            this.scene.forceRender = true;
-            this.scene.events.fire('camera.flipY', value);
-        }
     }
 
     get worldTransform() {

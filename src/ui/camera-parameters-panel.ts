@@ -1,4 +1,4 @@
-import { BooleanInput, Button, Container, Label, NumericInput } from '@playcanvas/pcui';
+import { BooleanInput, Button, Container, Label, NumericInput, SelectInput } from '@playcanvas/pcui';
 
 import type {
     CameraExportData,
@@ -14,6 +14,17 @@ import type { RecordedViewState } from '../recorded-view-trajectory';
 import { i18n } from './localization';
 
 type SelectionKey = keyof CameraExportSelection;
+
+type OutputSizePreset = 'current' | '1280x720' | '1920x1080' | '2560x1440' | '3840x2160' | 'custom';
+
+const OUTPUT_SIZE_STORAGE_KEY = 'supersplat.output-image-size.v1';
+
+const outputSizePresets: Partial<Record<OutputSizePreset, [number, number]>> = {
+    '1280x720': [1280, 720],
+    '1920x1080': [1920, 1080],
+    '2560x1440': [2560, 1440],
+    '3840x2160': [3840, 2160]
+};
 
 const selectionConfig: {
     key: SelectionKey;
@@ -159,6 +170,56 @@ class CameraParametersPanel extends Container {
         footer.append(secondaryActions);
         footer.append(saveButton);
 
+        const outputSizeTitle = new Label({
+            id: 'output-image-size-title',
+            text: 'PNG 输出尺寸'
+        });
+        const outputSizeControls = new Container({ id: 'output-image-size-controls' });
+        const outputPresetLabel = new Label({ text: '尺寸预设' });
+        const outputPreset = new SelectInput({
+            id: 'output-image-size-preset',
+            defaultValue: '1280x720',
+            options: [
+                { v: 'current', t: '当前渲染尺寸' },
+                { v: '1280x720', t: 'HD 1280 x 720' },
+                { v: '1920x1080', t: 'Full HD 1920 x 1080' },
+                { v: '2560x1440', t: 'QHD 2560 x 1440' },
+                { v: '3840x2160', t: '4K 3840 x 2160' },
+                { v: 'custom', t: '自定义' }
+            ]
+        });
+        const outputWidthLabel = new Label({ text: '宽度' });
+        const outputWidth = new NumericInput({
+            id: 'output-image-width',
+            value: 1280,
+            min: 1,
+            max: 16384,
+            precision: 0
+        });
+        const outputHeightLabel = new Label({ text: '高度' });
+        const outputHeight = new NumericInput({
+            id: 'output-image-height',
+            value: 720,
+            min: 1,
+            max: 16384,
+            precision: 0
+        });
+        const useCurrentSizeButton = new Button({
+            id: 'output-image-use-current',
+            text: '使用当前渲染尺寸'
+        });
+        const outputSizeStatus = new Label({
+            id: 'output-image-size-status',
+            text: '正在读取当前渲染尺寸...'
+        });
+        outputSizeControls.append(outputPresetLabel);
+        outputSizeControls.append(outputPreset);
+        outputSizeControls.append(outputWidthLabel);
+        outputSizeControls.append(outputWidth);
+        outputSizeControls.append(outputHeightLabel);
+        outputSizeControls.append(outputHeight);
+        outputSizeControls.append(useCurrentSizeButton);
+
         const wanTitle = new Label({
             id: 'wan-trajectory-title',
             text: 'WAN CAMERA TRAJECTORY'
@@ -170,38 +231,20 @@ class CameraParametersPanel extends Container {
             min: 1,
             precision: 0
         });
-        const wanWidthLabel = new Label({ text: '* 宽度' });
-        const wanWidth = new NumericInput({
-            value: 1280,
-            min: 1,
-            max: 16384,
-            precision: 0
-        });
-        const wanHeightLabel = new Label({ text: '* 高度' });
-        const wanHeight = new NumericInput({
-            value: 720,
-            min: 1,
-            max: 16384,
-            precision: 0
-        });
         const wanExportButton = new Button({
             id: 'wan-trajectory-export',
             text: '导出 WAN K/T + COLMAP'
         });
         const wanStatus = new Label({
             id: 'wan-trajectory-status',
-            text: '输出任意数量的连续相机位置与姿态'
+            text: '使用上方 PNG 输出尺寸生成内参与连续相机位姿'
         });
         const requiredNote = new Label({
             id: 'wan-trajectory-required-note',
-            text: '* 必填参数'
+            text: '* 相机数量必填；宽高使用上方 PNG 输出尺寸'
         });
         wanControls.append(wanFramesLabel);
         wanControls.append(wanFrames);
-        wanControls.append(wanWidthLabel);
-        wanControls.append(wanWidth);
-        wanControls.append(wanHeightLabel);
-        wanControls.append(wanHeight);
         wanControls.append(wanExportButton);
 
         const trajectoryFileTitle = new Label({
@@ -209,14 +252,16 @@ class CameraParametersPanel extends Container {
             text: 'COLMAP / OpenCV 外参'
         });
         const trajectoryFileActions = new Container({ id: 'trajectory-file-actions' });
-        const trajectoryJsonButton = new Button({ text: '导出外参 JSON' });
-        const trajectoryCsvButton = new Button({ text: '导出 W2C CSV' });
+        const trajectoryJsonButton = new Button({ id: 'trajectory-export-json', text: '导出 JSON' });
+        const trajectoryCsvButton = new Button({ id: 'trajectory-export-csv', text: '导出 CSV' });
+        const trajectoryTxtButton = new Button({ id: 'trajectory-export-txt', text: '导出 TXT' });
         const trajectoryFileStatus = new Label({
             id: 'trajectory-file-status',
-            text: '世界坐标使用首个可见高斯的原始 PLY；仅导出可写入 images.txt 的 W2C 外参'
+            text: 'JSON/CSV 为 W2C 外参；TXT 为 COLMAP images.txt（CAMERA_ID=1）'
         });
         trajectoryFileActions.append(trajectoryJsonButton);
         trajectoryFileActions.append(trajectoryCsvButton);
+        trajectoryFileActions.append(trajectoryTxtButton);
 
         const trajectoryImageTitle = new Label({
             id: 'trajectory-image-title',
@@ -230,7 +275,7 @@ class CameraParametersPanel extends Container {
         });
         const trajectoryImageStatus = new Label({
             id: 'trajectory-image-status',
-            text: '使用上方宽度和高度，按完成后的插值轨迹逐帧渲染'
+            text: '使用“PNG 输出尺寸”，按完成后的插值轨迹逐帧渲染'
         });
         trajectoryImageActions.append(trajectoryPreviewButton);
         trajectoryImageActions.append(trajectoryImageSaveButton);
@@ -239,6 +284,9 @@ class CameraParametersPanel extends Container {
         this.dom.appendChild(preview);
         this.append(selectionHeader);
         this.append(selectionContainer);
+        this.append(outputSizeTitle);
+        this.append(outputSizeControls);
+        this.append(outputSizeStatus);
         this.append(wanTitle);
         this.append(wanControls);
         this.append(requiredNote);
@@ -289,11 +337,127 @@ class CameraParametersPanel extends Container {
             }
         });
 
-        const getWanSettings = (): WanTrajectoryExportSettings => ({
-            cameraCount: Math.max(1, Math.trunc(wanFrames.value)),
-            width: Math.max(1, Math.trunc(wanWidth.value)),
-            height: Math.max(1, Math.trunc(wanHeight.value))
+        let syncingOutputSize = false;
+
+        const currentRenderSize = () => {
+            const size = events.invoke('targetSize') as { width?: number, height?: number } | undefined;
+            return {
+                width: Math.max(1, Math.trunc(size?.width ?? 1)),
+                height: Math.max(1, Math.trunc(size?.height ?? 1))
+            };
+        };
+
+        const maxOutputSize = () => {
+            const maximum = Number(events.invoke('render.maxTextureSize'));
+            return Number.isFinite(maximum) && maximum > 0 ? Math.min(16384, Math.trunc(maximum)) : 16384;
+        };
+
+        const setOutputSize = (width: number, height: number) => {
+            syncingOutputSize = true;
+            outputWidth.value = Math.max(1, Math.min(16384, Math.trunc(width)));
+            outputHeight.value = Math.max(1, Math.min(16384, Math.trunc(height)));
+            syncingOutputSize = false;
+        };
+
+        const saveOutputSize = () => {
+            try {
+                window.localStorage.setItem(OUTPUT_SIZE_STORAGE_KEY, JSON.stringify({
+                    preset: outputPreset.value,
+                    width: Math.trunc(outputWidth.value),
+                    height: Math.trunc(outputHeight.value)
+                }));
+            } catch {
+                // Storage may be unavailable in private or restricted browser contexts.
+            }
+        };
+
+        const refreshOutputSizeStatus = () => {
+            const current = currentRenderSize();
+            if (outputPreset.value === 'current') {
+                setOutputSize(current.width, current.height);
+            }
+            const width = Math.trunc(outputWidth.value);
+            const height = Math.trunc(outputHeight.value);
+            const maximum = maxOutputSize();
+            const valid = width >= 1 && height >= 1 && width <= maximum && height <= maximum;
+            outputSizeStatus.text = valid ?
+                `当前渲染 ${current.width} x ${current.height} · PNG 输出 ${width} x ${height} · 当前上限 ${maximum}` :
+                `PNG 输出 ${width} x ${height} 超出当前上限 ${maximum} x ${maximum}`;
+            outputSizeStatus.dom.dataset.state = valid ? 'valid' : 'error';
+        };
+
+        const getOutputSize = () => {
+            if (outputPreset.value === 'current') {
+                const current = currentRenderSize();
+                setOutputSize(current.width, current.height);
+            }
+            const width = Math.trunc(outputWidth.value);
+            const height = Math.trunc(outputHeight.value);
+            const maximum = maxOutputSize();
+            if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1) {
+                throw new Error('PNG 输出宽度和高度必须是正整数');
+            }
+            if (width > maximum || height > maximum) {
+                throw new Error(`当前输出最大支持 ${maximum} x ${maximum}`);
+            }
+            return { width, height };
+        };
+
+        outputPreset.on('change', (value: OutputSizePreset) => {
+            if (syncingOutputSize) return;
+            if (value === 'current') {
+                const current = currentRenderSize();
+                setOutputSize(current.width, current.height);
+            } else {
+                const preset = outputSizePresets[value];
+                if (preset) setOutputSize(preset[0], preset[1]);
+            }
+            saveOutputSize();
+            refreshOutputSizeStatus();
         });
+
+        const onOutputDimensionChange = () => {
+            if (syncingOutputSize) return;
+            syncingOutputSize = true;
+            outputPreset.value = 'custom';
+            syncingOutputSize = false;
+            saveOutputSize();
+            refreshOutputSizeStatus();
+        };
+        outputWidth.on('change', onOutputDimensionChange);
+        outputHeight.on('change', onOutputDimensionChange);
+        useCurrentSizeButton.on('click', () => {
+            outputPreset.value = 'current';
+        });
+
+        try {
+            const saved = JSON.parse(window.localStorage.getItem(OUTPUT_SIZE_STORAGE_KEY) ?? 'null') as {
+                preset?: OutputSizePreset,
+                width?: number,
+                height?: number
+            } | null;
+            const validPresets: OutputSizePreset[] = [
+                'current', '1280x720', '1920x1080', '2560x1440', '3840x2160', 'custom'
+            ];
+            if (saved && validPresets.includes(saved.preset as OutputSizePreset) &&
+                Number.isFinite(saved.width) && Number.isFinite(saved.height)) {
+                syncingOutputSize = true;
+                outputPreset.value = saved.preset as OutputSizePreset;
+                setOutputSize(saved.width as number, saved.height as number);
+                syncingOutputSize = false;
+            }
+        } catch {
+            // Ignore malformed or unavailable saved preferences.
+        }
+
+        const getWanSettings = (): WanTrajectoryExportSettings => {
+            const outputSize = getOutputSize();
+            return {
+                cameraCount: Math.max(1, Math.trunc(wanFrames.value)),
+                width: outputSize.width,
+                height: outputSize.height
+            };
+        };
 
         wanExportButton.on('click', async () => {
             wanExportButton.enabled = false;
@@ -304,7 +468,7 @@ class CameraParametersPanel extends Container {
                     'camera.saveWanTrajectory',
                     settings
                 ) as WanTrajectoryExportData;
-                wanStatus.text = `已验证并导出 ${data.camera_count} 个离散相机机位`;
+                wanStatus.text = `已导出 ${data.camera_count} 个 ${settings.width} x ${settings.height} 相机机位`;
             } catch (error) {
                 wanStatus.text = `导出失败：${error instanceof Error ? error.message : error}`;
             } finally {
@@ -322,7 +486,8 @@ class CameraParametersPanel extends Container {
                     'camera.saveCurrentTrajectory',
                     format
                 ) as CurrentTrajectoryExportData;
-                trajectoryFileStatus.text = `已校验并导出 ${data.pose_count} 个标准 W2C 外参 (${data.source_type})`;
+                trajectoryFileStatus.text =
+                    `已导出 ${data.pose_count} 个 ${format.toUpperCase()} W2C 外参 (${data.source_type})`;
             } catch (error) {
                 trajectoryFileStatus.text = `导出失败: ${error instanceof Error ? error.message : error}`;
             } finally {
@@ -331,6 +496,7 @@ class CameraParametersPanel extends Container {
         };
         trajectoryJsonButton.on('click', () => exportCurrentTrajectory('json', trajectoryJsonButton));
         trajectoryCsvButton.on('click', () => exportCurrentTrajectory('csv', trajectoryCsvButton));
+        trajectoryTxtButton.on('click', () => exportCurrentTrajectory('txt', trajectoryTxtButton));
 
         const refreshTrajectoryImageState = () => {
             const state = events.invoke('recordedView.state') as RecordedViewState | undefined;
@@ -356,6 +522,14 @@ class CameraParametersPanel extends Container {
                 return;
             }
 
+            let settings: WanTrajectoryExportSettings;
+            try {
+                settings = getWanSettings();
+            } catch (error) {
+                trajectoryImageStatus.text = `尺寸无效：${error instanceof Error ? error.message : error}`;
+                return;
+            }
+
             try {
                 const parentDirectory = await window.showDirectoryPicker({
                     id: 'SuperSplatTrajectoryImageExport',
@@ -363,7 +537,6 @@ class CameraParametersPanel extends Container {
                 });
                 trajectoryImageSaveButton.enabled = false;
                 trajectoryPreviewButton.enabled = false;
-                const settings = getWanSettings();
                 trajectoryImageStatus.text = `正在渲染 ${poses.length} 张 ${settings.width} x ${settings.height} PNG...`;
                 const result = await events.invoke('render.trajectoryImages', {
                     width: settings.width,
@@ -395,6 +568,7 @@ class CameraParametersPanel extends Container {
             if (data) {
                 preview.textContent = formatPreview(data);
             }
+            refreshOutputSizeStatus();
             refreshTrajectoryImageState();
         };
 

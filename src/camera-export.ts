@@ -2,12 +2,16 @@ import { ZipFileSystem } from '@playcanvas/splat-transform';
 import { Mat4, PROJECTION_PERSPECTIVE, Quat, Vec3 } from 'playcanvas';
 
 import { Pose } from './camera-poses';
-import type { ColmapW2cComponents } from './colmap-pose-presentation';
 import { ElementType } from './element';
 import { Events } from './events';
 import { BrowserFileSystem } from './io';
 import { Scene } from './scene';
 import { Splat } from './splat';
+import {
+    colmapW2cRowsToCsv as formatColmapW2cRowsToCsv,
+    colmapW2cRowsToImagesText,
+    type ColmapW2cTextRow
+} from './trajectory-export-format';
 
 type MatrixRows = [number[], number[], number[], number[]];
 
@@ -17,12 +21,9 @@ interface WanTrajectoryExportSettings {
     height: number;
 }
 
-type CurrentTrajectoryExportFormat = 'json' | 'csv';
+type CurrentTrajectoryExportFormat = 'json' | 'csv' | 'txt';
 
-type ColmapW2cPoseRow = ColmapW2cComponents & {
-    index: number,
-    image_name: string
-};
+type ColmapW2cPoseRow = ColmapW2cTextRow;
 
 type ColmapPoseValidation = {
     quaternion_norm_error: number,
@@ -872,34 +873,11 @@ const buildCurrentTrajectoryExport = (events: Events, scene?: Scene) => {
 
 type CurrentTrajectoryExportData = ReturnType<typeof buildCurrentTrajectoryExport>;
 
-const csvCell = (value: string | number) => {
-    const text = String(value);
-    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-};
+const currentTrajectoryToCsv = (data: CurrentTrajectoryExportData) => formatColmapW2cRowsToCsv(data.poses);
 
-const currentTrajectoryToCsv = (data: CurrentTrajectoryExportData) => {
-    const header = [
-        'index', 'image_name',
-        'qw_w2c', 'qx_w2c', 'qy_w2c', 'qz_w2c',
-        'tx_w2c', 'ty_w2c', 'tz_w2c'
-    ];
-    let previousQuaternion: number[] | null = null;
-    const rows = data.poses.map((pose) => {
-        let quaternion = [pose.qw_w2c, pose.qx_w2c, pose.qy_w2c, pose.qz_w2c];
-        if (previousQuaternion && quaternion.reduce(
-            (dot, value, component) => dot + value * previousQuaternion[component], 0
-        ) < 0) {
-            quaternion = quaternion.map(value => -value);
-        }
-        previousQuaternion = quaternion;
-        return [
-            pose.index, pose.image_name,
-            ...quaternion,
-            pose.tx_w2c, pose.ty_w2c, pose.tz_w2c
-        ];
-    });
-    return `${[header, ...rows].map(row => row.map(csvCell).join(',')).join('\n')}\n`;
-};
+const currentTrajectoryToTxt = (data: CurrentTrajectoryExportData) => (
+    colmapW2cRowsToImagesText(data.poses)
+);
 
 const colmapW2cRowsToCsv = (poses: ColmapW2cPoseRow[]) => currentTrajectoryToCsv({ poses } as CurrentTrajectoryExportData);
 
@@ -1009,12 +987,15 @@ const saveCurrentTrajectoryExport = async (
     format: CurrentTrajectoryExportFormat,
     scene?: Scene
 ) => {
-    if (format !== 'json' && format !== 'csv') throw new Error(`Unsupported trajectory format: ${format}`);
+    if (format !== 'json' && format !== 'csv' && format !== 'txt') {
+        throw new Error(`Unsupported trajectory format: ${format}`);
+    }
     const data = buildCurrentTrajectoryExport(events, scene);
     const date = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `colmap-w2c-trajectory-${data.pose_count}-poses-${date}.${format}`;
     const writer = new BrowserFileSystem(filename).createWriter(filename);
-    const text = format === 'json' ? `${JSON.stringify(data, null, 2)}\n` : currentTrajectoryToCsv(data);
+    const text = format === 'json' ? `${JSON.stringify(data, null, 2)}\n` :
+        (format === 'csv' ? currentTrajectoryToCsv(data) : currentTrajectoryToTxt(data));
     await writer.write(new TextEncoder().encode(text));
     await writer.close();
     return data;
@@ -1291,6 +1272,9 @@ const registerCameraExportEvents = (scene: Scene, events: Events) => {
     events.function('camera.buildCurrentTrajectoryCsv', () => (
         currentTrajectoryToCsv(buildCurrentTrajectoryExport(events, scene))
     ));
+    events.function('camera.buildCurrentTrajectoryTxt', () => (
+        currentTrajectoryToTxt(buildCurrentTrajectoryExport(events, scene))
+    ));
     events.function('camera.buildCurrentFrameColmapW2c', (index: number, imageName: string) => (
         buildCurrentFrame(index, imageName)
     ));
@@ -1313,6 +1297,7 @@ export {
     buildWanTrajectoryExport,
     colmapW2cRowsToCsv,
     currentTrajectoryToCsv,
+    currentTrajectoryToTxt,
     createCurrentFrameColmapW2cBuilder,
     registerCameraExportEvents,
     roundTripColmapPoses,

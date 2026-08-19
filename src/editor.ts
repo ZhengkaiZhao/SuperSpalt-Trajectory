@@ -377,14 +377,9 @@ const registerEditorEvents = (events: Events, editHistory: EditHistory, scene: S
         scene.camera.setPose(new Vec3(x * zoom, y * zoom, z * zoom), new Vec3(0, 0, 0));
     });
 
-    events.function('camera.flipY', () => scene.camera.flipY);
-    events.on('camera.setFlipY', (value: boolean) => scene.camera.setFlipY(value));
-    events.on('camera.toggleFlipY', () => scene.camera.setFlipY(!scene.camera.flipY));
-
-    // Front view keeps the current model focus and distance, restores the
-    // corrected presentation and uses a level perspective looking down -Z.
+    // Front view keeps the current model focus and distance and uses a level
+    // perspective looking down -Z. Presentation orientation is fixed globally.
     events.on('camera.front', () => {
-        scene.camera.setFlipY(true);
         scene.camera.setAzimElev(0, 0, 0);
         scene.camera.ortho = false;
         scene.forceRender = true;
@@ -439,18 +434,16 @@ const registerEditorEvents = (events: Events, editHistory: EditHistory, scene: S
     // gpu readback is ordered relative to other queued history ops (rapid drag +
     // undo, drag-while-camera-settling, etc).
     const runSelectIntersect = (splat: Splat, op: 'add'|'remove'|'set'|'intersect', options: any) => {
-        // Screen-space selection coordinates follow the displayed (possibly
-        // Y-flipped) image. World-space sphere/box transforms are unchanged.
-        if (scene.camera.flipY) {
-            if (options.rect) {
-                options = { ...options,
-                    rect: { ...options.rect,
-                        y1: 1 - options.rect.y2,
-                        y2: 1 - options.rect.y1 } };
-            }
-            if (options.mask) {
-                options = { ...options, maskFlipY: true };
-            }
+        // Selection is authored in the fixed presentation coordinates; GPU
+        // intersection consumes render coordinates.
+        if (options.rect) {
+            options = { ...options,
+                rect: { ...options.rect,
+                    y1: 1 - options.rect.y2,
+                    y2: 1 - options.rect.y1 } };
+        }
+        if (options.mask) {
+            options = { ...options, maskFlipY: true };
         }
         return scene.commandQueue.enqueue(async () => {
             const data = await scene.dataProcessor.intersect(options, splat);
@@ -606,7 +599,7 @@ const registerEditorEvents = (events: Events, editHistory: EditHistory, scene: S
                     mat.transformVec4(vec4, vec4);
                     const px = (vec4.x / vec4.w * 0.5 + 0.5) * width;
                     const renderY = (-vec4.y / vec4.w * 0.5 + 0.5) * height;
-                    const py = scene.camera.flipY ? height - renderY : renderY;
+                    const py = height - renderY;
                     if (Math.abs(px - sx) < splatSize && Math.abs(py - sy) < splatSize) {
                         mask[i] = 255;
                     }

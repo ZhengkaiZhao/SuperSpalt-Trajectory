@@ -12,6 +12,8 @@
 
 NVIDIA/RTX 用户可以双击 [`SuperSplat RTX.cmd`](SuperSplat%20RTX.cmd)。该入口使用独立 Chrome 配置和高性能 GPU 参数，且不包含任何固定用户目录。
 
+首次启动会按 `package-lock.json` 安装依赖并生成 release 构建，所需时间取决于网络和机器性能。后续启动会复用依赖、校验和构建缓存；RTX 启动器还会直接唤醒相同构建的已有窗口，不再重复关闭和启动 Chrome。需要主动重启 RTX 浏览器进程时运行 `SuperSplat RTX.cmd -Restart`。
+
 依赖或构建异常时执行完整修复：
 
 ```bat
@@ -41,12 +43,11 @@ start-windows.cmd --repair
 ## 主要功能
 
 - 加载和编辑 `.ply`、`.splat`、`.sog`、`.ksplat`、`.spz` 等高斯模型。
-- 使用右侧准星工具单击可见物体，快速靠近并将其设为新的环绕中心。
 - 在当前观察视角记录人工关键点，并插值成任意数量的相机轨迹。
 - 读取 COLMAP `images.txt`、可选 `cameras.txt` 及原始图片作为真实相机参考。
 - 拖入普通图片，在真实相机与虚拟轨迹候选中返回最大概率匹配，而不是假定百分百匹配。
 - 在右上角 HUD 实时查看并复制当前 COLMAP/OpenCV W2C Pose。
-- 导出可直接用于 COLMAP `images.txt` 的 `qw qx qy qz tx ty tz` CSV 外参。
+- 以 JSON、CSV 或 COLMAP `images.txt` 兼容 TXT 导出 `qw qx qy qz tx ty tz` W2C 外参。
 - 批量渲染插值轨迹 PNG，或导出 WAN K/T + COLMAP 数据包。
 - 对四元数归一化、旋转正交性、行列式、C2W/W2C 互逆和相机中心进行导出校验。
 

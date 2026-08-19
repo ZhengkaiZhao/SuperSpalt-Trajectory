@@ -68,13 +68,13 @@ class AssetLoader {
                 // user cancelled LOD selection
                 return null;
             }
-            const { gsplatData, transform } = result;
+            const { gsplatData } = result;
             validateGSplatData(gsplatData);
 
             const asset = this.createGSplatAsset(gsplatData, filename);
 
-            // Skip the default 180-degree rotation from splat-transform library
-            // to load models in their original orientation
+            // Keep the file's coordinates unchanged instead of applying the
+            // splat-transform PLY display rotation to the scene entity.
             return new Splat(asset, undefined);
         } finally {
             if (!animationFrame) {

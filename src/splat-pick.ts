@@ -57,7 +57,7 @@ const pickSplatSurfacePoint = (scene: Scene, splat: Splat, offsetX: number, offs
 
         const dx = Math.abs((vec4.x / vec4.w * 0.5 + 0.5) * cw - offsetX);
         const projectedY = (-vec4.y / vec4.w * 0.5 + 0.5) * ch;
-        const displayY = scene.camera.flipY ? ch - projectedY : projectedY;
+        const displayY = ch - projectedY;
         const dy = Math.abs(displayY - offsetY);
         if (dx >= PICK_RADIUS_FAR || dy >= PICK_RADIUS_FAR) {
             continue;

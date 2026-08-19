@@ -61,6 +61,8 @@ class ImageSettingsDialog extends Container {
         // preset
 
         // 360 output is 2:1 equirectangular (mirrors video's presets)
+        let targetSize = { width: 1, height: 1 };
+
         const buildPresetOptions = () => {
             return projectionSelect.value === 'equirect' ? [
                 { v: '360-1k', t: '1024x512' },
@@ -71,10 +73,13 @@ class ImageSettingsDialog extends Container {
                 { v: '360-8192', t: '8192x4096' },
                 { v: 'custom', t: i18n.t('popup.render-image.resolution.custom') }
             ] : [
-                { v: 'viewport', t: i18n.t('popup.render-image.resolution.current') },
-                { v: 'HD', t: 'HD' },
-                { v: 'QHD', t: 'QHD' },
-                { v: '4K', t: '4K' },
+                {
+                    v: 'viewport',
+                    t: `${i18n.t('popup.render-image.resolution.current')} (${targetSize.width} x ${targetSize.height})`
+                },
+                { v: 'HD', t: 'HD 1920 x 1080' },
+                { v: 'QHD', t: 'QHD 2560 x 1440' },
+                { v: '4K', t: '4K 3840 x 2160' },
                 { v: 'custom', t: i18n.t('popup.render-image.resolution.custom') }
             ];
         };
@@ -98,7 +103,7 @@ class ImageSettingsDialog extends Container {
             class: 'vector-input',
             dimensions: 2,
             min: 4,
-            max: 16000,
+            max: 16384,
             precision: 0,
             value: [1024, 768]
         });
@@ -206,8 +211,6 @@ class ImageSettingsDialog extends Container {
 
         this.append(dialog);
 
-        let targetSize: { width: number, height: number };
-
         // Handle custom resolution activation
 
         const updateResolution = () => {
@@ -297,7 +300,14 @@ class ImageSettingsDialog extends Container {
         // function implementations
 
         this.show = () => {
-            targetSize = events.invoke('targetSize');
+            const currentSize = events.invoke('targetSize') as { width?: number, height?: number } | undefined;
+            targetSize = {
+                width: Math.max(1, Math.trunc(currentSize?.width ?? 1)),
+                height: Math.max(1, Math.trunc(currentSize?.height ?? 1))
+            };
+            const selectedPreset = presetSelect.value;
+            presetSelect.options = buildPresetOptions();
+            presetSelect.value = selectedPreset;
 
             reset();
 

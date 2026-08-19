@@ -319,11 +319,9 @@
     "tooltip.right-toolbar.show-hide": "Mostrar/Ocultar Splats",
     "tooltip.right-toolbar.orbit-camera": "Câmera Orbital",
     "tooltip.right-toolbar.fly-camera": "Câmera de Voo",
-    "tooltip.right-toolbar.quick-focus": "Clique no objeto para aproximar",
     "tooltip.right-toolbar.frame-selection": "Selecionar Quadro",
     "tooltip.right-toolbar.reset-camera": "Redefinir Câmera",
     "tooltip.right-toolbar.front-camera": "Vista frontal nivelada",
-    "tooltip.right-toolbar.flip-y": "Inverter vista verticalmente",
     "tooltip.right-toolbar.colors": "Cores",
     "tooltip.right-toolbar.settings": "Configurações",
 

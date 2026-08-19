@@ -1,4 +1,4 @@
-import { Asset, Quat } from 'playcanvas';
+import { Asset } from 'playcanvas';
 
 import { Events } from './events';
 import { loadGSplatData, MappedReadFileSystem, validateGSplatData } from './io';
@@ -7,11 +7,9 @@ import { Splat } from './splat';
 
 type FrameData = {
     asset: Asset;
-    rotation: Quat;
 };
 
-// A source of animation frames. getFrame produces a ready gsplat Asset (plus the
-// orientation to apply when the persistent splat is first created) for a frame.
+// A source of animation frames. getFrame produces a ready gsplat Asset for a frame.
 interface FrameSource {
     readonly frameCount: number;
     getFrame(index: number): Promise<FrameData>;
@@ -46,12 +44,11 @@ class PlyFrameSource implements FrameSource {
         fileSystem.addFile(file.name, file);
 
         // skipReorder: animation frames prioritise load speed over morton ordering
-        const { gsplatData, transform } = await loadGSplatData(file.name, fileSystem, true);
+        const { gsplatData } = await loadGSplatData(file.name, fileSystem, true);
         validateGSplatData(gsplatData);
 
         const asset = this.scene.assetLoader.createGSplatAsset(gsplatData, file.name);
-        // Skip default 180-degree rotation to match single-file loading behavior
-        return { asset, rotation: undefined };
+        return { asset };
     }
 
     destroy() {}
@@ -76,7 +73,9 @@ const registerSequenceEvents = (events: Events, scene: Scene) => {
     // apply a frame's data to the persistent splat, creating it on the first frame
     const applyFrame = async (data: FrameData) => {
         if (!splat) {
-            splat = new Splat(data.asset, data.rotation);
+            // Keep sequence frames in the same unchanged file coordinates as
+            // single-file loading.
+            splat = new Splat(data.asset, undefined);
             await scene.add(splat);
         } else {
             // in-place swap: preserves entity transform, visual props and selection
