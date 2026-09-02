@@ -133,6 +133,7 @@ const assetLoaderSource = await readFile(new URL('../src/asset-loader.ts', impor
 const sequenceSource = await readFile(new URL('../src/sequence.ts', import.meta.url), 'utf8');
 const splatSerializeSource = await readFile(new URL('../src/splat-serialize.ts', import.meta.url), 'utf8');
 const cameraSource = await readFile(new URL('../src/camera.ts', import.meta.url), 'utf8');
+const controllerSource = await readFile(new URL('../src/controllers.ts', import.meta.url), 'utf8');
 const rightToolbarSource = await readFile(new URL('../src/ui/right-toolbar.ts', import.meta.url), 'utf8');
 const blitShaderSource = await readFile(new URL('../src/shaders/blit-shader.ts', import.meta.url), 'utf8');
 const renderSource = await readFile(new URL('../src/render.ts', import.meta.url), 'utf8');
@@ -140,11 +141,47 @@ const cameraParametersPanelSource = await readFile(new URL('../src/ui/camera-par
 const imageSettingsDialogSource = await readFile(new URL('../src/ui/image-settings-dialog.ts', import.meta.url), 'utf8');
 const rtxLauncherSource = await readFile(new URL('./launch-rtx.ps1', import.meta.url), 'utf8');
 const rtxWatcherSource = await readFile(new URL('./watch-rtx-lifecycle.ps1', import.meta.url), 'utf8');
+const macNodeLauncherSource = await readFile(new URL('./ensure-node-macos.zsh', import.meta.url), 'utf8');
 const modelLoadSource = `${assetLoaderSource}\n${sequenceSource}`;
 assert.doesNotMatch(
     splatSerializeSource,
     /setFromEulerAngles\(\s*0\s*,\s*0\s*,\s*-?180\s*\)/,
     'splat serialization must not apply a hidden 180-degree Z rotation'
+);
+assert.match(
+    controllerSource,
+    /camera\.azim \+ dx \* camera\.scene\.config\.controls\.orbitSensitivity/,
+    'horizontal orbit dragging must use direct-manipulation direction'
+);
+assert.match(
+    controllerSource,
+    /event\.clientX - rect\.left[\s\S]*event\.clientY - rect\.top/,
+    'camera input coordinates must be relative to the canvas container, not the event target'
+);
+assert.match(
+    controllerSource,
+    /controlClickAsRight = event\.button === 0 && event\.ctrlKey[\s\S]*pressedButton = controlClickAsRight \? 2 : event\.button/,
+    'macOS Control+click must provide the same pan gesture as a right mouse button'
+);
+assert.match(
+    controllerSource,
+    /wrap\(target, 'pointercancel', pointercancel\)[\s\S]*wrap\(target, 'lostpointercapture', pointercancel\)/,
+    'camera input must clear interrupted macOS pointer gestures'
+);
+assert.match(
+    controllerSource,
+    /const clearAllKeys = \(\) => \{[\s\S]*resetMouseState\(\);[\s\S]*touches = \[\]/,
+    'camera input must clear pointer gestures when a macOS window loses focus'
+);
+assert.match(
+    macNodeLauncherSource,
+    /\/opt\/homebrew\/bin\/brew[\s\S]*\/usr\/local\/bin\/brew/,
+    'the macOS launcher must find Homebrew from Finder on Apple Silicon and Intel Macs'
+);
+assert.doesNotMatch(
+    macNodeLauncherSource,
+    /brew upgrade[^\n]*\|\| true/,
+    'the macOS launcher must not hide Homebrew upgrade failures'
 );
 assert.doesNotMatch(
     modelLoadSource,

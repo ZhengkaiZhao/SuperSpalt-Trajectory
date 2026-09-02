@@ -16,6 +16,16 @@ class PointerController {
 
     constructor(camera: Camera, target: HTMLElement) {
 
+        // offsetX/offsetY are relative to the event's original target, which
+        // differs between canvas/container events and across macOS browsers.
+        const localPoint = (event: MouseEvent | PointerEvent | WheelEvent) => {
+            const rect = target.getBoundingClientRect();
+            return {
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
+            };
+        };
+
         // The WebGPU presentation has one fixed Y inversion. Convert pointer
         // input back to render coordinates so navigation matches the display.
         const renderY = (value: number) => target.clientHeight - value;
@@ -23,7 +33,8 @@ class PointerController {
 
         // Orbit mode: rotate camera around the focal point
         const orbit = (dx: number, dy: number) => {
-            const azim = camera.azim - dx * camera.scene.config.controls.orbitSensitivity;
+            // Direct manipulation: scene motion follows horizontal dragging.
+            const azim = camera.azim + dx * camera.scene.config.controls.orbitSensitivity;
             const elev = camera.elevation - renderDeltaY(dy) * camera.scene.config.controls.orbitSensitivity;
             camera.setAzimElev(azim, elev);
         };
@@ -55,7 +66,17 @@ class PointerController {
 
         // mouse state
         let pressedButton = -1;  // no button pressed, otherwise 0, 1, or 2
+        let physicalButton = -1;
+        let pressedButtonMask = 0;
+        let controlClickAsRight = false;
         let x: number, y: number;
+
+        const resetMouseState = () => {
+            pressedButton = -1;
+            physicalButton = -1;
+            pressedButtonMask = 0;
+            controlClickAsRight = false;
+        };
 
         // middle-mouse click-vs-drag tracking (for MMB single-click to focus)
         const CLICK_DRAG_THRESHOLD = 4;
@@ -72,21 +93,26 @@ class PointerController {
                     return;
                 }
                 target.setPointerCapture(event.pointerId);
-                pressedButton = event.button;
-                x = event.offsetX;
-                y = event.offsetY;
+                const point = localPoint(event);
+                physicalButton = event.button;
+                pressedButtonMask = event.buttons || [1, 4, 2][event.button];
+                // macOS exposes Control+click as a secondary click on devices
+                // without a dedicated right button. Treat it exactly like RMB.
+                controlClickAsRight = event.button === 0 && event.ctrlKey;
+                pressedButton = controlClickAsRight ? 2 : event.button;
+                x = point.x;
+                y = point.y;
                 if (pressedButton === 1) {
                     mmbStartX = x;
                     mmbStartY = y;
                     mmbDragged = false;
                 }
             } else if (event.pointerType === 'touch') {
-                if (touches.length === 0) {
-                    target.setPointerCapture(event.pointerId);
-                }
+                const point = localPoint(event);
+                target.setPointerCapture(event.pointerId);
                 touches.push({
-                    x: event.offsetX,
-                    y: event.offsetY,
+                    x: point.x,
+                    y: point.y,
                     id: event.pointerId
                 });
 
@@ -101,17 +127,20 @@ class PointerController {
         const pointerup = (event: PointerEvent) => {
             if (event.pointerType === 'mouse') {
                 // Only release if this is the button that was initially pressed
-                if (event.button === pressedButton) {
+                if (event.button === physicalButton) {
+                    const point = localPoint(event);
                     // MMB tap (no significant movement) -> focus on cursor point (orbit only; fly uses MMB for zoom)
                     if (pressedButton === 1 && camera.controlMode === 'orbit' && !mmbDragged) {
-                        camera.pickFocalPoint(event.offsetX / target.clientWidth, event.offsetY / target.clientHeight);
+                        camera.pickFocalPoint(point.x / target.clientWidth, point.y / target.clientHeight);
                     }
-                    pressedButton = -1;
-                    target.releasePointerCapture(event.pointerId);
+                    resetMouseState();
+                    if (target.hasPointerCapture(event.pointerId)) {
+                        target.releasePointerCapture(event.pointerId);
+                    }
                 }
             } else {
                 touches = touches.filter(touch => touch.id !== event.pointerId);
-                if (touches.length === 0) {
+                if (target.hasPointerCapture(event.pointerId)) {
                     target.releasePointerCapture(event.pointerId);
                 }
             }
@@ -125,18 +154,17 @@ class PointerController {
                 }
 
                 // Verify the button we're tracking is still pressed
-                // 1 = left button, 4 = middle button, 2 = right button
-                const buttonMask = [1, 4, 2][pressedButton];
-                if ((event.buttons & buttonMask) === 0) {
+                if ((event.buttons & pressedButtonMask) === 0) {
                     // Button is no longer pressed, clean up
-                    pressedButton = -1;
+                    resetMouseState();
                     return;
                 }
 
-                const dx = event.offsetX - x;
-                const dy = event.offsetY - y;
-                x = event.offsetX;
-                y = event.offsetY;
+                const point = localPoint(event);
+                const dx = point.x - x;
+                const dy = point.y - y;
+                x = point.x;
+                y = point.y;
 
                 if (camera.controlMode === 'fly') {
                     // Fly mode: left-drag to look around, middle to zoom, right works same as orbit
@@ -146,7 +174,7 @@ class PointerController {
                         zoom(dy * -0.02);
                     } else if (pressedButton === 2) {
                         // Right button: same behavior as orbit mode
-                        const mod = event.shiftKey || event.ctrlKey ? 'look' :
+                        const mod = event.shiftKey || (!controlClickAsRight && event.ctrlKey) ? 'look' :
                             (event.altKey || event.metaKey ? 'zoom' : 'pan');
 
                         if (mod === 'look') {
@@ -164,7 +192,7 @@ class PointerController {
                     //   (gated on a small drag threshold so a tap can be used to focus on release)
                     // - right button: pan, Shift/Ctrl -> orbit, Alt/Meta -> zoom
                     if (pressedButton === 1 && !mmbDragged) {
-                        if (dist(event.offsetX, event.offsetY, mmbStartX, mmbStartY) < CLICK_DRAG_THRESHOLD) {
+                        if (dist(point.x, point.y, mmbStartX, mmbStartY) < CLICK_DRAG_THRESHOLD) {
                             return;
                         }
                         mmbDragged = true;
@@ -172,7 +200,7 @@ class PointerController {
 
                     let mod: 'orbit' | 'pan' | 'zoom';
                     if (pressedButton === 2) {
-                        mod = event.shiftKey || event.ctrlKey ? 'orbit' :
+                        mod = event.shiftKey || (!controlClickAsRight && event.ctrlKey) ? 'orbit' :
                             (event.altKey || event.metaKey ? 'zoom' : 'pan');
                     } else if (pressedButton === 1) {
                         mod = event.shiftKey ? 'pan' :
@@ -190,12 +218,13 @@ class PointerController {
                     }
                 }
             } else {
+                const point = localPoint(event);
                 if (touches.length === 1) {
                     const touch = touches[0];
-                    const dx = event.offsetX - touch.x;
-                    const dy = event.offsetY - touch.y;
-                    touch.x = event.offsetX;
-                    touch.y = event.offsetY;
+                    const dx = point.x - touch.x;
+                    const dy = point.y - touch.y;
+                    touch.x = point.x;
+                    touch.y = point.y;
 
                     if (camera.controlMode === 'fly') {
                         look(dx, dy);
@@ -204,8 +233,8 @@ class PointerController {
                     }
                 } else if (touches.length === 2) {
                     const touch = touches[touches.map(t => t.id).indexOf(event.pointerId)];
-                    touch.x = event.offsetX;
-                    touch.y = event.offsetY;
+                    touch.x = point.x;
+                    touch.y = point.y;
 
                     const mx = (touches[0].x + touches[1].x) * 0.5;
                     const my = (touches[0].y + touches[1].y) * 0.5;
@@ -228,6 +257,14 @@ class PointerController {
                     midy = my;
                     midlen = ml;
                 }
+            }
+        };
+
+        const pointercancel = (event: PointerEvent) => {
+            if (event.pointerType === 'mouse') {
+                resetMouseState();
+            } else {
+                touches = touches.filter(touch => touch.id !== event.pointerId);
             }
         };
 
@@ -261,6 +298,7 @@ class PointerController {
 
         const wheel = (event: WheelEvent) => {
             const { deltaX, deltaY } = event;
+            const point = localPoint(event);
 
             // Some browsers (notably Safari/Firefox on macOS) remap a vertical
             // mouse wheel to deltaX when Shift is held. Only fall back to
@@ -278,7 +316,7 @@ class PointerController {
                 if (isOrbit) {
                     look(deltaX, deltaY);
                 } else if (event.shiftKey) {
-                    pan(event.offsetX, event.offsetY, deltaX, deltaY);
+                    pan(point.x, point.y, deltaX, deltaY);
                 } else if (camera.ortho) {
                     // moving forward/backward has no visual effect in ortho
                     // (ortho height derives from distance), so zoom instead,
@@ -296,7 +334,7 @@ class PointerController {
             } else if (isOrbit) {
                 orbit(deltaX, deltaY);
             } else if (event.shiftKey) {
-                pan(event.offsetX, event.offsetY, deltaX, deltaY);
+                pan(point.x, point.y, deltaX, deltaY);
             } else if (isPinch) {
                 zoom(deltaY * -0.02);
             } else {
@@ -310,12 +348,14 @@ class PointerController {
         const canvas = camera.scene.app.graphicsDevice.canvas;
 
         const dblclick = (event: globalThis.MouseEvent) => {
-            if (event.target === target || event.target === canvas) {
+            if (event.button === 0 && (event.target === target || event.composedPath().includes(canvas))) {
+                const point = localPoint(event);
                 // Switch to orbit mode when double-clicking to focus
                 if (camera.controlMode === 'fly') {
                     camera.scene.events.fire('camera.setControlMode', 'orbit');
                 }
-                camera.pickFocalPoint(event.offsetX / target.clientWidth, event.offsetY / target.clientHeight);
+                camera.pickFocalPoint(point.x / target.clientWidth, point.y / target.clientHeight);
+                event.preventDefault();
             }
         };
 
@@ -342,6 +382,8 @@ class PointerController {
             fastDown = false;
             slowDown = false;
             ctrlDown = false;
+            resetMouseState();
+            touches = [];
         };
 
         // Helper to switch to fly mode when a fly key is pressed
@@ -455,6 +497,8 @@ class PointerController {
         wrap(target, 'pointerdown', pointerdown);
         wrap(target, 'pointerup', pointerup);
         wrap(target, 'pointermove', pointermove);
+        wrap(target, 'pointercancel', pointercancel);
+        wrap(target, 'lostpointercapture', pointercancel);
         wrap(target, 'wheel', wheel, { passive: false });
         wrap(target, 'dblclick', dblclick);
         wrap(window, 'blur', clearAllKeys);
