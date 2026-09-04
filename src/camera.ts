@@ -755,19 +755,24 @@ class Camera extends Element {
     }
 
     // intersect the scene at the normalized screen location (0-1 range) and focus the camera on this location
-    async pickFocalPoint(x: number, y: number) {
+    async pickFocalPoint(x: number, y: number, preserveDistance: boolean = false) {
         const result = await this.intersect(x, y);
         if (result) {
             const { scene } = this;
 
             this.setFocalPoint(result.position);
-            this.setDistance(result.distance / this.sceneRadius * this.fovFactor);
+            if (!preserveDistance) {
+                this.setDistance(result.distance / this.sceneRadius * this.fovFactor);
+            }
             scene.events.fire('camera.focalPointPicked', {
                 camera: this,
                 splat: result.splat,
-                position: result.position
+                position: result.position,
+                preserveDistance
             });
+            return true;
         }
+        return false;
     }
 
     // pick mode

@@ -1,6 +1,14 @@
-import { Vec3 } from 'playcanvas';
+import { platform, Vec3 } from 'playcanvas';
 
 import { Camera } from './camera';
+import {
+    beginMouseGesture,
+    cameraFocusEvent,
+    isCameraFocusActivation,
+    mouseGestureIsActive,
+    orbitAzimuthDelta,
+    resolveMouseDragAction
+} from './camera-input-policy';
 
 const fromWorldPoint = new Vec3();
 const toWorldPoint = new Vec3();
@@ -15,6 +23,8 @@ class PointerController {
     destroy: () => void;
 
     constructor(camera: Camera, target: HTMLElement) {
+
+        const isMacOS = platform.name === 'osx';
 
         // offsetX/offsetY are relative to the event's original target, which
         // differs between canvas/container events and across macOS browsers.
@@ -33,8 +43,7 @@ class PointerController {
 
         // Orbit mode: rotate camera around the focal point
         const orbit = (dx: number, dy: number) => {
-            // Direct manipulation: scene motion follows horizontal dragging.
-            const azim = camera.azim + dx * camera.scene.config.controls.orbitSensitivity;
+            const azim = camera.azim + orbitAzimuthDelta(dx, isMacOS) * camera.scene.config.controls.orbitSensitivity;
             const elev = camera.elevation - renderDeltaY(dy) * camera.scene.config.controls.orbitSensitivity;
             camera.setAzimElev(azim, elev);
         };
@@ -94,18 +103,20 @@ class PointerController {
                 }
                 target.setPointerCapture(event.pointerId);
                 const point = localPoint(event);
-                physicalButton = event.button;
-                pressedButtonMask = event.buttons || [1, 4, 2][event.button];
-                // macOS exposes Control+click as a secondary click on devices
-                // without a dedicated right button. Treat it exactly like RMB.
-                controlClickAsRight = event.button === 0 && event.ctrlKey;
-                pressedButton = controlClickAsRight ? 2 : event.button;
+                const gesture = beginMouseGesture(event.button, event.buttons, event.ctrlKey, isMacOS);
+                physicalButton = gesture.physicalButton;
+                pressedButtonMask = gesture.buttonMask;
+                controlClickAsRight = gesture.controlClickAsRight;
+                pressedButton = gesture.navigationButton;
                 x = point.x;
                 y = point.y;
                 if (pressedButton === 1) {
                     mmbStartX = x;
                     mmbStartY = y;
                     mmbDragged = false;
+                }
+                if (isMacOS && pressedButton === 2) {
+                    event.preventDefault();
                 }
             } else if (event.pointerType === 'touch') {
                 const point = localPoint(event);
@@ -128,6 +139,7 @@ class PointerController {
             if (event.pointerType === 'mouse') {
                 // Only release if this is the button that was initially pressed
                 if (event.button === physicalButton) {
+                    const preventSecondaryDefault = isMacOS && pressedButton === 2;
                     const point = localPoint(event);
                     // MMB tap (no significant movement) -> focus on cursor point (orbit only; fly uses MMB for zoom)
                     if (pressedButton === 1 && camera.controlMode === 'orbit' && !mmbDragged) {
@@ -136,6 +148,9 @@ class PointerController {
                     resetMouseState();
                     if (target.hasPointerCapture(event.pointerId)) {
                         target.releasePointerCapture(event.pointerId);
+                    }
+                    if (preventSecondaryDefault) {
+                        event.preventDefault();
                     }
                 }
             } else {
@@ -154,7 +169,7 @@ class PointerController {
                 }
 
                 // Verify the button we're tracking is still pressed
-                if ((event.buttons & pressedButtonMask) === 0) {
+                if (!mouseGestureIsActive(event.buttons, pressedButtonMask, isMacOS)) {
                     // Button is no longer pressed, clean up
                     resetMouseState();
                     return;
@@ -167,30 +182,22 @@ class PointerController {
                 y = point.y;
 
                 if (camera.controlMode === 'fly') {
-                    // Fly mode: left-drag to look around, middle to zoom, right works same as orbit
-                    if (pressedButton === 0) {
+                    const action = resolveMouseDragAction(
+                        'fly', pressedButton, event, controlClickAsRight, isMacOS
+                    );
+                    if (action === 'look') {
                         look(dx, dy);
-                    } else if (pressedButton === 1) {
+                    } else if (action === 'zoom') {
                         zoom(dy * -0.02);
-                    } else if (pressedButton === 2) {
-                        // Right button: same behavior as orbit mode
-                        const mod = event.shiftKey || (!controlClickAsRight && event.ctrlKey) ? 'look' :
-                            (event.altKey || event.metaKey ? 'zoom' : 'pan');
-
-                        if (mod === 'look') {
-                            look(dx, dy);
-                        } else if (mod === 'zoom') {
-                            zoom(dy * -0.02);
-                        } else {
-                            pan(x, y, dx, dy);
-                        }
+                    } else {
+                        pan(x, y, dx, dy);
                     }
                 } else {
                     // Orbit mode:
                     // - left button: orbit
                     // - middle button (Blender-style): orbit, Shift -> pan, Ctrl -> zoom
                     //   (gated on a small drag threshold so a tap can be used to focus on release)
-                    // - right button: pan, Shift/Ctrl -> orbit, Alt/Meta -> zoom
+                    // - right button: always pan on macOS; other platforms keep the modifier mappings
                     if (pressedButton === 1 && !mmbDragged) {
                         if (dist(point.x, point.y, mmbStartX, mmbStartY) < CLICK_DRAG_THRESHOLD) {
                             return;
@@ -198,16 +205,9 @@ class PointerController {
                         mmbDragged = true;
                     }
 
-                    let mod: 'orbit' | 'pan' | 'zoom';
-                    if (pressedButton === 2) {
-                        mod = event.shiftKey || (!controlClickAsRight && event.ctrlKey) ? 'orbit' :
-                            (event.altKey || event.metaKey ? 'zoom' : 'pan');
-                    } else if (pressedButton === 1) {
-                        mod = event.shiftKey ? 'pan' :
-                            (event.ctrlKey ? 'zoom' : 'orbit');
-                    } else {
-                        mod = 'orbit';
-                    }
+                    const mod = resolveMouseDragAction(
+                        'orbit', pressedButton, event, controlClickAsRight, isMacOS
+                    );
 
                     if (mod === 'orbit') {
                         orbit(dx, dy);
@@ -216,6 +216,10 @@ class PointerController {
                     } else {
                         pan(x, y, dx, dy);
                     }
+                }
+
+                if (isMacOS && pressedButton === 2) {
+                    event.preventDefault();
                 }
             } else {
                 const point = localPoint(event);
@@ -344,17 +348,24 @@ class PointerController {
             event.preventDefault();
         };
 
-        // FIXME: safari sends canvas as target of dblclick event but chrome sends the target element
         const canvas = camera.scene.app.graphicsDevice.canvas;
 
-        const dblclick = (event: globalThis.MouseEvent) => {
+        const focus = (event: globalThis.MouseEvent) => {
+            if (!isCameraFocusActivation(event.type, event.detail, isMacOS)) {
+                return;
+            }
             if (event.button === 0 && (event.target === target || event.composedPath().includes(canvas))) {
                 const point = localPoint(event);
+                const width = target.getBoundingClientRect().width;
+                const height = target.getBoundingClientRect().height;
+                if (width <= 0 || height <= 0) return;
                 // Switch to orbit mode when double-clicking to focus
                 if (camera.controlMode === 'fly') {
                     camera.scene.events.fire('camera.setControlMode', 'orbit');
                 }
-                camera.pickFocalPoint(point.x / target.clientWidth, point.y / target.clientHeight);
+                const normalizedX = Math.max(0, Math.min(1, point.x / width));
+                const normalizedY = Math.max(0, Math.min(1, point.y / height));
+                camera.pickFocalPoint(normalizedX, normalizedY, isMacOS);
                 event.preventDefault();
             }
         };
@@ -509,7 +520,7 @@ class PointerController {
         wrap(target, 'pointercancel', pointercancel);
         wrap(target, 'lostpointercapture', pointercancel);
         wrap(target, 'wheel', wheel, { passive: false });
-        wrap(target, 'dblclick', dblclick);
+        wrap(target, cameraFocusEvent(isMacOS), focus);
         wrap(window, 'blur', clearAllKeys);
 
         // Registered directly (not via wrap) so physical-Ctrl tracking
