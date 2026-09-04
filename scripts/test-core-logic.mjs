@@ -20,6 +20,7 @@ const ranking = await importTypeScript(new URL('../src/image-pose-match-ranking.
 const posePresentation = await importTypeScript(new URL('../src/colmap-pose-presentation.ts', import.meta.url));
 const rotationSearch = await importTypeScript(new URL('../src/image-pose-rotation-search.ts', import.meta.url));
 const trajectoryFormat = await importTypeScript(new URL('../src/trajectory-export-format.ts', import.meta.url));
+const cameraInput = await importTypeScript(new URL('../src/camera-input-policy.ts', import.meta.url));
 
 const validProject = {
     splats: [{
@@ -37,6 +38,32 @@ const validProject = {
     },
     poseSets: [{ poses: [{ position: [0, 0, 1], target: [0, 0, 0], fov: 60 }] }]
 };
+
+assert.equal(cameraInput.orbitAzimuthDelta(-12, true), 12);
+assert.equal(cameraInput.orbitAzimuthDelta(-12, false), -12);
+
+const macControlPrimary = cameraInput.beginMouseGesture(0, 1, true, true);
+assert.equal(macControlPrimary.physicalButton, 0);
+assert.equal(macControlPrimary.navigationButton, 2);
+assert.equal(macControlPrimary.controlClickAsRight, true);
+
+const macControlSecondary = cameraInput.beginMouseGesture(2, 2, true, true);
+assert.equal(macControlSecondary.physicalButton, 2);
+assert.equal(macControlSecondary.navigationButton, 2);
+assert.equal(macControlSecondary.controlClickAsRight, true);
+
+const noModifiers = { shiftKey: false, ctrlKey: false, altKey: false, metaKey: false };
+const controlModifier = { ...noModifiers, ctrlKey: true };
+assert.equal(cameraInput.resolveMouseDragAction('orbit', 2, noModifiers, false, true), 'pan');
+assert.equal(cameraInput.resolveMouseDragAction('orbit', 2, controlModifier, true, true), 'pan');
+assert.equal(cameraInput.resolveMouseDragAction('fly', 2, noModifiers, false, true), 'pan');
+assert.equal(cameraInput.mouseGestureIsActive(0, 2, true), true);
+assert.equal(cameraInput.mouseGestureIsActive(0, 2, false), false);
+assert.equal(cameraInput.cameraFocusEvent(true), 'click');
+assert.equal(cameraInput.isCameraFocusActivation('click', 2, true), true);
+assert.equal(cameraInput.isCameraFocusActivation('click', 1, true), false);
+assert.equal(cameraInput.cameraFocusEvent(false), 'dblclick');
+assert.equal(cameraInput.isCameraFocusActivation('dblclick', 2, false), true);
 
 assert.equal(projectDocument.validateProjectDocument(validProject), validProject);
 assert.throws(
@@ -159,8 +186,8 @@ assert.doesNotMatch(
 );
 assert.match(
     controllerSource,
-    /camera\.azim \+ dx \* camera\.scene\.config\.controls\.orbitSensitivity/,
-    'horizontal orbit dragging must use direct-manipulation direction'
+    /platform\.name === 'osx'[\s\S]*orbitAzimuthDelta\(dx, isMacOS\)/,
+    'macOS orbit dragging must use its isolated direct-manipulation direction'
 );
 assert.match(
     controllerSource,
@@ -169,8 +196,18 @@ assert.match(
 );
 assert.match(
     controllerSource,
-    /controlClickAsRight = event\.button === 0 && event\.ctrlKey[\s\S]*pressedButton = controlClickAsRight \? 2 : event\.button/,
-    'macOS Control+click must provide the same pan gesture as a right mouse button'
+    /beginMouseGesture\(event\.button, event\.buttons, event\.ctrlKey, isMacOS\)[\s\S]*resolveMouseDragAction/,
+    'macOS mouse buttons must be normalized before resolving their camera action'
+);
+assert.match(
+    controllerSource,
+    /camera\.pickFocalPoint\(normalizedX, normalizedY, isMacOS\)[\s\S]*cameraFocusEvent\(isMacOS\)/,
+    'macOS double-click focus must use click-count activation and preserve viewing distance'
+);
+assert.match(
+    cameraSource,
+    /pickFocalPoint\(x: number, y: number, preserveDistance[\s\S]*if \(!preserveDistance\)[\s\S]*setDistance/,
+    'camera focus must support changing the macOS orbit center without changing viewing distance'
 );
 assert.match(
     controllerSource,
