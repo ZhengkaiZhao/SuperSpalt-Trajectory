@@ -20,6 +20,7 @@ import { Progress } from './progress';
 import { PublishSettingsDialog } from './publish-settings-dialog';
 import { RightToolbar } from './right-toolbar';
 import { ScenePanel } from './scene-panel';
+import { SelectionEditPanel } from './selection-edit-panel';
 import { SettingsPanel } from './settings-panel';
 import { ShortcutsPopup } from './shortcuts-popup';
 import { Spinner } from './spinner';
@@ -96,6 +97,7 @@ class EditorUI {
 
         // bottom toolbar
         const scenePanel = new ScenePanel(events, tooltips);
+        const selectionEditPanel = new SelectionEditPanel(events, tooltips);
         const settingsPanel = new SettingsPanel(events, tooltips);
         const colorPanel = new ColorPanel(events, tooltips);
         const bottomToolbar = new BottomToolbar(events, tooltips);
@@ -115,6 +117,7 @@ class EditorUI {
         canvasContainer.append(trajectoryPlannerPanel);
         canvasContainer.append(toolsContainer);
         canvasContainer.append(scenePanel);
+        canvasContainer.append(selectionEditPanel);
         canvasContainer.append(settingsPanel);
         canvasContainer.append(colorPanel);
         canvasContainer.append(bottomToolbar);

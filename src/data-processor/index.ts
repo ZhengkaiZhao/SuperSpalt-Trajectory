@@ -15,7 +15,7 @@ import { CalcBound } from './calc-bound';
 import { CalcHistogram, CalcHistogramOptions } from './calc-histogram';
 import { CalcPositions } from './calc-positions';
 import { Intersect, IntersectOptions } from './intersect';
-import { SelectByRange, SelectByRangeOptions } from './select-by-range';
+import type { SelectByRangeOptions } from './select-by-range';
 import { Splat } from '../splat';
 
 const resolve = (scope: ScopeSpace, values: any) => {
@@ -41,7 +41,6 @@ class DataProcessor {
     private calcBoundImpl: CalcBound;
     private calcPositionsImpl: CalcPositions;
     private calcHistogramImpl: CalcHistogram;
-    private selectByRangeImpl: SelectByRange;
 
     constructor(device: GraphicsDevice) {
         this.device = device;
@@ -71,7 +70,6 @@ class DataProcessor {
         this.calcBoundImpl = new CalcBound(device);
         this.calcPositionsImpl = new CalcPositions(device);
         this.calcHistogramImpl = new CalcHistogram(device);
-        this.selectByRangeImpl = new SelectByRange(device);
     }
 
     // calculate the intersection of a mask canvas with splat centers.
@@ -90,17 +88,17 @@ class DataProcessor {
         return this.calcPositionsImpl.run(splat);
     }
 
-    // calculate histogram (bin counts + min/max) entirely on GPU
+    // calculate exact values on GPU, then aggregate min/max and bins on CPU
     calcHistogram(splat: Splat, mode: number, options?: CalcHistogramOptions) {
         return this.calcHistogramImpl.run(splat, mode, options);
     }
 
-    // compute a per-splat byte mask (255 = in range and visible, 0 = not) for
-    // the given histogram bucket range. mode matches the propMode dispatch in
-    // src/shaders/splat-value-shader.ts (0..20 = built-in props, 21+N = f_rest_N).
+    // compute exact per-splat values on GPU, then build a byte mask on CPU
+    // (255 = in range and visible, 0 = not). mode matches the propMode dispatch
+    // in src/shaders/splat-value-shader.ts (0..20 = built-ins, 21+N = f_rest_N).
     // returns an owned mask buffer the caller must release via releaseMask().
     selectByRange(splat: Splat, mode: number, options: SelectByRangeOptions) {
-        return this.selectByRangeImpl.run(splat, mode, options, this.bufferPool);
+        return this.calcHistogramImpl.selectByRange(splat, mode, options, this.bufferPool);
     }
 
     // release a mask buffer returned by intersect() or selectByRange() back to

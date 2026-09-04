@@ -73,6 +73,13 @@
     "panel.colors.black-point": "검은 점",
     "panel.colors.white-point": "흰 점",
     "panel.colors.transparency": "투명도",
+    "panel.selection-edit.title": "선택 편집",
+    "panel.selection-edit.selected": "선택됨",
+    "panel.selection-edit.position-offset": "위치 오프셋",
+    "panel.selection-edit.scale-multiplier": "크기 배율",
+    "panel.selection-edit.opacity": "불투명도",
+    "panel.selection-edit.color-tint": "색상 조정",
+    "panel.selection-edit.quick-actions": "빠른 작업",
     "panel.colors.reset": "리셋",
 
     "panel.settings": "설정",

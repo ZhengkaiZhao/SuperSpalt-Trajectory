@@ -73,6 +73,13 @@
     "panel.colors.black-point": "Точка чёрного",
     "panel.colors.white-point": "Точка белого",
     "panel.colors.transparency": "Прозрачность",
+    "panel.selection-edit.title": "Редактирование выделения",
+    "panel.selection-edit.selected": "Выбрано",
+    "panel.selection-edit.position-offset": "Смещение позиции",
+    "panel.selection-edit.scale-multiplier": "Множитель масштаба",
+    "panel.selection-edit.opacity": "Непрозрачность",
+    "panel.selection-edit.color-tint": "Оттенок цвета",
+    "panel.selection-edit.quick-actions": "Быстрые действия",
     "panel.colors.reset": "Сбросить",
 
     "panel.settings": "Настройки",

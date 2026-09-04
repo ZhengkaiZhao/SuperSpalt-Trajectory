@@ -55,6 +55,20 @@ function Read-LauncherState {
     }
 }
 
+function Test-SuperSplatServerProcess([object]$ProcessInfo) {
+    if (-not $ProcessInfo -or $ProcessInfo.Name -ine 'node.exe' -or -not $ProcessInfo.CommandLine) {
+        return $false
+    }
+
+    # Node preserves the separator spelling supplied by its caller. Accept both
+    # `scripts/start-local.mjs` and `scripts\start-local.mjs` while validating
+    # the complete launcher signature.
+    $normalizedCommandLine = $ProcessInfo.CommandLine -replace '\\', '/'
+    return $normalizedCommandLine -like '*scripts/start-local.mjs*' -and
+        $normalizedCommandLine -like '*--port=3011*' -and
+        $normalizedCommandLine -like '*--strict-port*'
+}
+
 function Stop-LifecycleWatcher {
     $state = Read-LauncherState
     if (-not $state -or -not $state.watcherProcessId) { return }
@@ -164,8 +178,9 @@ if ($initialSetupRequired) {
 $listener = Get-NetTCPConnection -LocalPort 3011 -State Listen -ErrorAction SilentlyContinue |
     Select-Object -First 1
 if (-not $listener) {
+    $serverScript = Join-Path $repoRoot 'scripts\start-local.mjs'
     Start-Process -FilePath $nodePath `
-        -ArgumentList @('scripts\start-local.mjs', '--no-open', '--port=3011', '--strict-port') `
+        -ArgumentList @("`"$serverScript`"", '--no-open', '--port=3011', '--strict-port') `
         -WorkingDirectory $repoRoot `
         -WindowStyle Hidden
 
@@ -191,11 +206,7 @@ $listener = Get-NetTCPConnection -LocalPort 3011 -State Listen -ErrorAction Sile
 if (-not $listener) { throw 'SuperSpalt server did not acquire port 3011.' }
 $serverProcessInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" `
     -ErrorAction SilentlyContinue
-if (-not $serverProcessInfo -or
-    $serverProcessInfo.Name -ine 'node.exe' -or
-    $serverProcessInfo.CommandLine -notlike '*scripts\start-local.mjs*' -or
-    $serverProcessInfo.CommandLine -notlike '*--port=3011*' -or
-    $serverProcessInfo.CommandLine -notlike '*--strict-port*') {
+if (-not (Test-SuperSplatServerProcess $serverProcessInfo)) {
     throw 'Port 3011 is not owned by this SuperSpalt local server.'
 }
 $serverProcessId = [int]$listener.OwningProcess

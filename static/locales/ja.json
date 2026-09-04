@@ -73,6 +73,13 @@
     "panel.colors.black-point": "黒点",
     "panel.colors.white-point": "白点",
     "panel.colors.transparency": "透明度",
+    "panel.selection-edit.title": "選択を編集",
+    "panel.selection-edit.selected": "選択済み",
+    "panel.selection-edit.position-offset": "位置オフセット",
+    "panel.selection-edit.scale-multiplier": "スケール倍率",
+    "panel.selection-edit.opacity": "不透明度",
+    "panel.selection-edit.color-tint": "カラー調整",
+    "panel.selection-edit.quick-actions": "クイック操作",
     "panel.colors.reset": "リセット",
 
     "panel.settings": "設定",

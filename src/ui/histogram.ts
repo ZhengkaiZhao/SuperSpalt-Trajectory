@@ -71,6 +71,8 @@ class Histogram {
         let dragStart = 0;
         let dragEnd = 0;
         let activePointerId = -1;
+        let mouseFallbackActive = false;
+        let suppressNextClick = false;
         let hovering = false;
 
         const offsetToBucket = (offset: number) => {
@@ -117,6 +119,14 @@ class Histogram {
             });
         };
 
+        const beginDrag = (clientX: number) => {
+            if (dragging || !this.histogram.numValues) return false;
+            dragging = true;
+            dragStart = dragEnd = offsetToBucket(clientX);
+            updateHighlight();
+            return true;
+        };
+
         // unify drag-end behavior so pointerup commits and pointercancel /
         // lostpointercapture abort without leaving `dragging` stuck true. all
         // three event paths funnel here, so the SVG highlight rect cannot be
@@ -135,6 +145,13 @@ class Histogram {
                 activePointerId = -1;
             }
             if (commit) {
+                // A browser click follows mouse/pointer up. Suppress that one
+                // compatibility event so the committed range is not replaced
+                // by a second, single-bin selection.
+                suppressNextClick = true;
+                window.setTimeout(() => {
+                    suppressNextClick = false;
+                }, 0);
                 const op = opFromModifiers({ shiftKey, ctrlKey });
                 this.events.fire('select', op, Math.min(dragStart, dragEnd), Math.max(dragStart, dragEnd));
             } else {
@@ -146,14 +163,9 @@ class Histogram {
             e.preventDefault();
             e.stopPropagation();
 
-            const h = this.histogram;
-
-            if (h.numValues) {
+            if (e.isPrimary && e.button === 0 && beginDrag(e.clientX)) {
                 this.canvas.setPointerCapture(e.pointerId);
                 activePointerId = e.pointerId;
-                dragging = true;
-                dragStart = dragEnd = offsetToBucket(e.clientX);
-                updateHighlight();
             }
         });
 
@@ -177,6 +189,46 @@ class Histogram {
         // on the event so add/remove/set are preserved.
         this.canvas.addEventListener('lostpointercapture', (e: PointerEvent) => {
             endDrag(true, e.shiftKey, e.ctrlKey);
+        });
+
+        // Mouse events are a compatibility fallback for WebViews and macOS
+        // wrappers that expose mouse input but omit part of the Pointer Events
+        // sequence. In normal browsers pointerdown starts the drag first, so
+        // these handlers see `dragging` and remain inert.
+        this.canvas.addEventListener('mousedown', (e: MouseEvent) => {
+            if (e.button === 0 && beginDrag(e.clientX)) {
+                mouseFallbackActive = true;
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        window.addEventListener('mousemove', (e: MouseEvent) => {
+            if (!mouseFallbackActive || !dragging) return;
+            dragEnd = offsetToBucket(e.clientX);
+            updateHighlight();
+            e.preventDefault();
+        });
+
+        window.addEventListener('mouseup', (e: MouseEvent) => {
+            if (!mouseFallbackActive || e.button !== 0) return;
+            mouseFallbackActive = false;
+            endDrag(true, e.shiftKey, e.ctrlKey);
+        });
+
+        // Keyboard activation and some browser automation APIs emit `click`
+        // without a pointer/mouse down sequence. Treat that as a one-bin set,
+        // while normal drags are suppressed by endDrag above.
+        this.canvas.addEventListener('click', (e: MouseEvent) => {
+            if (suppressNextClick) {
+                suppressNextClick = false;
+                return;
+            }
+            if (!this.histogram.numValues) return;
+            const bucket = offsetToBucket(e.clientX);
+            this.events.fire('select', opFromModifiers(e), bucket, bucket);
+            e.preventDefault();
+            e.stopPropagation();
         });
 
         this.canvas.addEventListener('pointermove', (e: PointerEvent) => {

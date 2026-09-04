@@ -73,6 +73,13 @@
     "panel.colors.black-point": "Punto negro",
     "panel.colors.white-point": "Punto blanco",
     "panel.colors.transparency": "Transparencia",
+    "panel.selection-edit.title": "Editar selección",
+    "panel.selection-edit.selected": "Seleccionados",
+    "panel.selection-edit.position-offset": "Desplazamiento de posición",
+    "panel.selection-edit.scale-multiplier": "Multiplicador de escala",
+    "panel.selection-edit.opacity": "Opacidad",
+    "panel.selection-edit.color-tint": "Tinte de color",
+    "panel.selection-edit.quick-actions": "Acciones rápidas",
     "panel.colors.reset": "Restablecer",
 
     "panel.settings": "Ajustes",

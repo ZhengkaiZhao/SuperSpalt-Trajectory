@@ -1,0 +1,156 @@
+@use 'colors.scss' as *;
+
+#selection-edit-panel {
+    position: absolute;
+    top: 102px;
+    right: 102px;
+    z-index: 30;
+    display: flex;
+    width: 320px;
+    max-width: calc(100% - 126px);
+    max-height: calc(100% - 160px);
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid $bcg-lighter;
+    background: $bcg-primary;
+    box-shadow: 4px 6px 16px rgba(0, 0, 0, 0.7);
+    pointer-events: all;
+
+    &.pcui-hidden {
+        display: none;
+    }
+
+    > .panel-header {
+        min-height: 36px;
+        padding: 0 8px;
+        flex-shrink: 0;
+    }
+
+    .selection-info {
+        display: flex;
+        min-height: 34px;
+        padding: 0 10px;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        border-bottom: 1px solid $bcg-lighter;
+        background: $bcg-dark;
+    }
+
+    .selection-label {
+        color: $text-secondary;
+        font-size: 12px;
+    }
+
+    .selection-count {
+        margin-left: 12px;
+        color: $clr-hilight;
+        font-size: 15px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .selection-edit-controls {
+        display: flex;
+        min-height: 0;
+        padding: 8px 10px 10px;
+        flex-direction: column;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .selection-edit-section {
+        display: flex;
+        padding: 8px 0 10px;
+        flex-direction: column;
+        flex-shrink: 0;
+        border-bottom: 1px solid $bcg-lighter;
+
+        &:last-child {
+            border-bottom: 0;
+        }
+
+        .section-title {
+            min-height: 18px;
+            margin: 0 0 7px;
+            padding: 0;
+            color: $text-secondary;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+    }
+
+    .numeric-control-row,
+    .control-row {
+        display: flex;
+        min-width: 0;
+        min-height: 28px;
+        margin: 0 0 4px;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .numeric-control-label {
+        width: 42px;
+        min-width: 42px;
+        margin: 0;
+        color: $text-secondary;
+        text-align: right;
+    }
+
+    .numeric-control-input,
+    .selection-edit-slider {
+        min-width: 0;
+        margin: 0;
+        flex: 1;
+    }
+
+    .slider-value-label {
+        width: 44px;
+        min-width: 44px;
+        margin: 0;
+        color: $text-primary;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .selection-edit-button {
+        width: 100%;
+        min-height: 30px;
+        margin: 4px 0 0;
+        border: 1px solid $bcg-lighter;
+        border-radius: 3px;
+        background: $bcg-dark;
+        color: $text-primary;
+
+        &:hover {
+            border-color: $clr-hilight;
+            background: $bcg-darker;
+        }
+
+        &.danger {
+            color: #ff7a84;
+
+            &:hover {
+                border-color: $error;
+            }
+        }
+    }
+}
+
+@media (max-width: 1400px) {
+    #selection-edit-panel {
+        width: 280px;
+    }
+}
+
+@media (max-width: 768px) {
+    #selection-edit-panel {
+        top: 64px;
+        right: 70px;
+        width: min(300px, calc(100% - 86px));
+        max-width: none;
+        max-height: calc(100% - 120px);
+    }
+}

@@ -73,6 +73,13 @@
     "panel.colors.black-point": "黑点",
     "panel.colors.white-point": "白点",
     "panel.colors.transparency": "透明度",
+    "panel.selection-edit.title": "编辑选中高斯点",
+    "panel.selection-edit.selected": "已选择",
+    "panel.selection-edit.position-offset": "位置偏移",
+    "panel.selection-edit.scale-multiplier": "缩放倍数",
+    "panel.selection-edit.opacity": "不透明度",
+    "panel.selection-edit.color-tint": "颜色调整",
+    "panel.selection-edit.quick-actions": "快捷操作",
     "panel.colors.reset": "重置",
 
     "panel.settings": "设置",

@@ -58,11 +58,16 @@ Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" |
 # PID reuse is guarded by checking the exact launcher command before stopping
 # the local server. Never terminate an unrelated Node process on the same PID.
 $serverInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$ServerProcessId"
+$normalizedServerCommandLine = if ($serverInfo.CommandLine) {
+    $serverInfo.CommandLine -replace '\\', '/'
+} else {
+    ''
+}
 if ($serverInfo -and
     $serverInfo.Name -ieq 'node.exe' -and
-    $serverInfo.CommandLine -like '*scripts\start-local.mjs*' -and
-    $serverInfo.CommandLine -like '*--port=3011*' -and
-    $serverInfo.CommandLine -like '*--strict-port*') {
+    $normalizedServerCommandLine -like '*scripts/start-local.mjs*' -and
+    $normalizedServerCommandLine -like '*--port=3011*' -and
+    $normalizedServerCommandLine -like '*--strict-port*') {
     Stop-Process -Id $ServerProcessId -Force -ErrorAction SilentlyContinue
 }
 

@@ -164,9 +164,9 @@ vec3 unpackSHTriplet(int coeffIdx, ivec2 uv) {
 }
 #endif
 
-// populate s from the given index. returns false when the splat is
-// out-of-bounds or in a locked / deleted state; in that case only idx, state,
-// valid, and selected are reliably set.
+// Populate s from the given index. Selection passes reject locked/deleted
+// splats; histogram value-map passes defer that filtering to authoritative CPU
+// state after readback.
 bool readSplat(int idx, out Splat s) {
     s.idx = idx;
     s.uv = ivec2(0);
@@ -183,7 +183,9 @@ bool readSplat(int idx, out Splat s) {
     s.state = int(texelFetch(splatState, s.uv, 0).r * 255.0 + 0.5);
     s.selected = (s.state == 1);
     bool clean = (s.state == 0);
+    #ifndef HISTOGRAM_VALUE_MAP
     if (!(s.selected || clean)) return false;
+    #endif
     s.valid = true;
 
     uvec4 transformAData = texelFetch(transformA, s.uv, 0);

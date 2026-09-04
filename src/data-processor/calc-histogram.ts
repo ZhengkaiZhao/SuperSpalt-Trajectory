@@ -1,7 +1,5 @@
 import {
     ADDRESS_CLAMP_TO_EDGE,
-    BLENDEQUATION_ADD,
-    BLENDMODE_ONE,
     PIXELFORMAT_RGBA32F,
     SEMANTIC_POSITION,
     drawQuadWithShader,
@@ -16,14 +14,12 @@ import {
     Vec3
 } from 'playcanvas';
 
-import { drawPointsWithShader } from './draw-points';
-import { GRID_DIM, NUM_BINS } from './histogram-config';
+import { BufferPool } from './buffer-pool';
+import { NUM_BINS } from './histogram-config';
+import type { SelectByRangeOptions } from './select-by-range';
 import {
     fullscreenVS,
-    tileMinMaxFS,
-    finalReduceFS,
-    binVS,
-    binFS
+    valueMapFS
 } from '../shaders/histogram-shaders';
 import { Splat } from '../splat';
 
@@ -62,112 +58,51 @@ const getShBands = (splat: Splat): number => {
 class CalcHistogram {
     private device: GraphicsDevice;
 
-    // shaders are compiled per SH_BANDS value so that each variant declares only
-    // the SH samplers it actually reads. reduceShader has no SH dependence.
-    private tileShaders: Map<number, Shader> = new Map();
-    private binShaders: Map<number, Shader> = new Map();
-    private reduceShader: Shader = null;
+    // Compile per SH_BANDS so each variant declares only the SH samplers it reads.
+    private valueShaders: Map<number, Shader> = new Map();
 
-    private tileTex: Texture = null;
-    private tileRT: RenderTarget = null;
-    private minMaxTex: Texture = null;
-    private minMaxRT: RenderTarget = null;
-    private binTex: Texture = null;
-    private binRT: RenderTarget = null;
+    private valueTex: Texture = null;
+    private valueRT: RenderTarget = null;
 
-    private minMaxData = new Float32Array(4);
-    private binData = new Float32Array(NUM_BINS * 4);
-
-    private additiveBlend: BlendState;
+    private valueData = new Float32Array(0);
 
     constructor(device: GraphicsDevice) {
         this.device = device;
-
-        this.additiveBlend = new BlendState(
-            true,
-            BLENDEQUATION_ADD, BLENDMODE_ONE, BLENDMODE_ONE,
-            BLENDEQUATION_ADD, BLENDMODE_ONE, BLENDMODE_ONE
-        );
     }
 
-    private ensureSharedResources() {
-        const { device } = this;
+    private ensureValueResources(width: number, height: number) {
+        if (this.valueTex?.width === width && this.valueTex.height === height) return;
 
-        if (!this.reduceShader) {
-            this.reduceShader = ShaderUtils.createShader(device, {
-                uniqueName: 'histFinalReduce',
-                attributes: { vertex_position: SEMANTIC_POSITION },
-                vertexGLSL: fullscreenVS,
-                fragmentGLSL: finalReduceFS
-            });
-        }
+        this.valueRT?.destroy();
+        this.valueTex?.destroy();
 
-        if (!this.tileTex) {
-            this.tileTex = new Texture(device, {
-                name: 'histTile',
-                width: GRID_DIM,
-                height: GRID_DIM,
-                format: PIXELFORMAT_RGBA32F,
-                mipmaps: false,
-                addressU: ADDRESS_CLAMP_TO_EDGE,
-                addressV: ADDRESS_CLAMP_TO_EDGE
-            });
-            this.tileRT = new RenderTarget({ colorBuffer: this.tileTex, depth: false });
-
-            this.minMaxTex = new Texture(device, {
-                name: 'histMinMax',
-                width: 1,
-                height: 1,
-                format: PIXELFORMAT_RGBA32F,
-                mipmaps: false,
-                addressU: ADDRESS_CLAMP_TO_EDGE,
-                addressV: ADDRESS_CLAMP_TO_EDGE
-            });
-            this.minMaxRT = new RenderTarget({ colorBuffer: this.minMaxTex, depth: false });
-
-            this.binTex = new Texture(device, {
-                name: 'histBins',
-                width: NUM_BINS,
-                height: 1,
-                format: PIXELFORMAT_RGBA32F,
-                mipmaps: false,
-                addressU: ADDRESS_CLAMP_TO_EDGE,
-                addressV: ADDRESS_CLAMP_TO_EDGE
-            });
-            this.binRT = new RenderTarget({ colorBuffer: this.binTex, depth: false });
-        }
+        this.valueTex = new Texture(this.device, {
+            name: 'histValues',
+            width,
+            height,
+            format: PIXELFORMAT_RGBA32F,
+            mipmaps: false,
+            addressU: ADDRESS_CLAMP_TO_EDGE,
+            addressV: ADDRESS_CLAMP_TO_EDGE
+        });
+        this.valueRT = new RenderTarget({ colorBuffer: this.valueTex, depth: false });
+        this.valueData = new Float32Array(width * height * 4);
     }
 
-    private getTileShader(shBands: number): Shader {
-        let shader = this.tileShaders.get(shBands);
+    private getValueShader(shBands: number): Shader {
+        let shader = this.valueShaders.get(shBands);
         if (!shader) {
             const defines = new Map<string, string>();
             defines.set('SH_BANDS', `${shBands}`);
+            defines.set('HISTOGRAM_VALUE_MAP', '');
             shader = ShaderUtils.createShader(this.device, {
-                uniqueName: `histTileMinMax_SH${shBands}`,
+                uniqueName: `histValues_SH${shBands}`,
                 attributes: { vertex_position: SEMANTIC_POSITION },
                 vertexGLSL: fullscreenVS,
-                fragmentGLSL: tileMinMaxFS,
+                fragmentGLSL: valueMapFS,
                 fragmentDefines: defines
             });
-            this.tileShaders.set(shBands, shader);
-        }
-        return shader;
-    }
-
-    private getBinShader(shBands: number): Shader {
-        let shader = this.binShaders.get(shBands);
-        if (!shader) {
-            const defines = new Map<string, string>();
-            defines.set('SH_BANDS', `${shBands}`);
-            shader = ShaderUtils.createShader(this.device, {
-                uniqueName: `histBin_SH${shBands}`,
-                attributes: { vertex_position: SEMANTIC_POSITION },
-                vertexGLSL: binVS,
-                fragmentGLSL: binFS,
-                vertexDefines: defines
-            });
-            this.binShaders.set(shBands, shader);
+            this.valueShaders.set(shBands, shader);
         }
         return shader;
     }
@@ -237,98 +172,52 @@ class CalcHistogram {
         return numSplats;
     }
 
-    private clearRT(rt: RenderTarget) {
-        const d = this.device as any;
-        const oldRt = d.renderTarget;
-        const oldVx = d.vx, oldVy = d.vy, oldVw = d.vw, oldVh = d.vh;
-        const oldSx = d.sx, oldSy = d.sy, oldSw = d.sw, oldSh = d.sh;
-
-        d.setRenderTarget(rt);
-        d.updateBegin();
-        d.setViewport(0, 0, rt.width, rt.height);
-        d.setScissor(0, 0, rt.width, rt.height);
-        d.clear({ color: [0, 0, 0, 0], flags: 1 });
-        d.updateEnd();
-
-        d.setRenderTarget(oldRt);
-        d.setViewport(oldVx, oldVy, oldVw, oldVh);
-        d.setScissor(oldSx, oldSy, oldSw, oldSh);
-    }
-
-    // release all GPU resources owned by this instance. peer data-processor
-    // classes (Intersect, SelectByRange, CalcBound) destroy resources only on
-    // size change; CalcHistogram resources are fixed-size, so this exists for
-    // explicit teardown (context loss, scene reload) rather than per-run reuse.
+    // Release resources on context loss, scene reload or processor teardown.
     destroy() {
-        this.tileRT?.destroy();
-        this.tileTex?.destroy();
-        this.minMaxRT?.destroy();
-        this.minMaxTex?.destroy();
-        this.binRT?.destroy();
-        this.binTex?.destroy();
-        this.tileRT = null;
-        this.tileTex = null;
-        this.minMaxRT = null;
-        this.minMaxTex = null;
-        this.binRT = null;
-        this.binTex = null;
-        this.tileShaders.clear();
-        this.binShaders.clear();
-        this.reduceShader = null;
+        this.valueRT?.destroy();
+        this.valueTex?.destroy();
+        this.valueRT = null;
+        this.valueTex = null;
+        this.valueShaders.clear();
     }
 
     async run(splat: Splat, mode: number, options?: CalcHistogramOptions): Promise<CalcHistogramResult> {
-        this.ensureSharedResources();
         const { device } = this;
-        const { scope } = device;
 
         const shBands = getShBands(splat);
-        const tileShader = this.getTileShader(shBands);
-        const binShader = this.getBinShader(shBands);
+        const valueShader = this.getValueShader(shBands);
 
         const numSplats = this.setSplatUniforms(splat, mode, options);
+        const transformA = (splat.resource as any).getTexture('transformA');
+        this.ensureValueResources(transformA.width, transformA.height);
 
-        const tileSize = Math.ceil(numSplats / (GRID_DIM * GRID_DIM));
-        scope.resolve('tileSize').setValue(tileSize);
-        scope.resolve('gridDim').setValue(GRID_DIM);
-
-        // pass 1: tile min/max (fullscreen quad over GRID_DIM x GRID_DIM)
+        // Calculate one exact scalar value and visibility flag per splat on GPU.
         device.setBlendState(BlendState.NOBLEND);
-        drawQuadWithShader(device, this.tileRT, tileShader);
+        drawQuadWithShader(device, this.valueRT, valueShader);
 
-        // pass 2: final reduce 64x64 → 1x1
-        scope.resolve('inputTex').setValue(this.tileTex);
-        scope.resolve('gridDim').setValue(GRID_DIM);
-        device.setBlendState(BlendState.NOBLEND);
-        drawQuadWithShader(device, this.minMaxRT, this.reduceShader);
-
-        // pass 3: clear bins, then additive-blend point dispatch
-        this.clearRT(this.binRT);
-
-        // bin shader needs same splat uniforms + minMax + numBins
-        this.setSplatUniforms(splat, mode, options);
-        scope.resolve('minMax').setValue(this.minMaxTex);
-        scope.resolve('numBins').setValue(NUM_BINS);
-
-        drawPointsWithShader(device, this.binRT, binShader, numSplats, this.additiveBlend);
-
-        // readback minMax (8 bytes) and bins (4 KB)
-        await this.minMaxTex.read(0, 0, 1, 1, {
-            renderTarget: this.minMaxRT,
-            data: this.minMaxData,
-            immediate: false
+        // Histogram refreshes run outside the regular frame pass. Immediate
+        // submission prevents mapAsync waiting for a later on-demand frame.
+        await this.valueTex.read(0, 0, this.valueTex.width, this.valueTex.height, {
+            renderTarget: this.valueRT,
+            data: this.valueData,
+            immediate: true
         });
 
-        await this.binTex.read(0, 0, NUM_BINS, 1, {
-            renderTarget: this.binRT,
-            data: this.binData,
-            immediate: false
-        });
+        const state = splat.splatData.getProp('state') as Uint8Array;
+        let min = Infinity;
+        let max = -Infinity;
 
-        let min = this.minMaxData[0];
-        let max = this.minMaxData[1];
+        // CPU state is authoritative. The GPU state texture is optimized for
+        // rendering and its encoding differs across backends.
+        for (let i = 0; i < numSplats; i++) {
+            const base = i * 4;
+            if ((state[i] & 6) || this.valueData[base + 2] < 0.5) continue;
+            const value = this.valueData[base];
+            if (!Number.isFinite(value)) continue;
+            min = Math.min(min, value);
+            max = Math.max(max, value);
+        }
 
-        // detect "nothing contributed" (sentinel survives reduction)
         if (min > max) {
             min = 0;
             max = 0;
@@ -337,15 +226,60 @@ class CalcHistogram {
         const selected = new Float32Array(NUM_BINS);
         const unselected = new Float32Array(NUM_BINS);
         let numValues = 0;
-        for (let i = 0; i < NUM_BINS; i++) {
-            const s = this.binData[i * 4];
-            const u = this.binData[i * 4 + 1];
-            selected[i] = s;
-            unselected[i] = u;
-            numValues += s + u;
+        const range = max - min;
+        for (let i = 0; i < numSplats; i++) {
+            const base = i * 4;
+            if (state[i] & 6) continue;
+            if (this.valueData[base + 2] < 0.5) continue;
+
+            const value = this.valueData[base];
+            if (!Number.isFinite(value)) continue;
+
+            const normalized = range === 0 ? 0 : (value - min) / range;
+            const bin = Math.max(0, Math.min(NUM_BINS - 1, Math.floor(normalized * NUM_BINS)));
+            if (state[i] & 1) {
+                selected[bin]++;
+            } else {
+                unselected[bin]++;
+            }
+            numValues++;
         }
 
         return { selected, unselected, min, max, numValues };
+    }
+
+    async selectByRange(
+        splat: Splat,
+        mode: number,
+        options: SelectByRangeOptions,
+        bufferPool: BufferPool
+    ): Promise<Uint8Array> {
+        // Reuse the exact value-map path used to draw the histogram. The old
+        // RGBA8 mask shader produced an all-zero readback on WebGPU, while this
+        // RGBA32F path is already required and verified for histogram display.
+        await this.run(splat, mode, options);
+
+        const numSplats = splat.splatData.numSplats;
+        const state = splat.splatData.getProp('state') as Uint8Array;
+        const mask = bufferPool.acquire(numSplats);
+        mask.fill(0);
+
+        const valueRange = options.max - options.min;
+        for (let i = 0; i < numSplats; i++) {
+            const base = i * 4;
+            if ((state[i] & 6) || this.valueData[base + 2] < 0.5) continue;
+
+            const value = this.valueData[base];
+            if (!Number.isFinite(value)) continue;
+
+            const normalized = valueRange === 0 ? 0 : (value - options.min) / valueRange;
+            const bin = Math.max(0, Math.min(options.numBins - 1, Math.floor(normalized * options.numBins)));
+            if (bin >= options.rangeStart && bin <= options.rangeEnd) {
+                mask[i] = 255;
+            }
+        }
+
+        return mask;
     }
 }
 

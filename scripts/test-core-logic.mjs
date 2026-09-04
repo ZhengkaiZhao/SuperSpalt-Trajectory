@@ -135,9 +135,11 @@ const splatSerializeSource = await readFile(new URL('../src/splat-serialize.ts',
 const cameraSource = await readFile(new URL('../src/camera.ts', import.meta.url), 'utf8');
 const controllerSource = await readFile(new URL('../src/controllers.ts', import.meta.url), 'utf8');
 const editorSource = await readFile(new URL('../src/editor.ts', import.meta.url), 'utf8');
+const advancedEditOpsSource = await readFile(new URL('../src/edit-ops-advanced.ts', import.meta.url), 'utf8');
 const preferencesSource = await readFile(new URL('../src/preferences.ts', import.meta.url), 'utf8');
 const rightToolbarSource = await readFile(new URL('../src/ui/right-toolbar.ts', import.meta.url), 'utf8');
 const settingsPanelSource = await readFile(new URL('../src/ui/settings-panel.ts', import.meta.url), 'utf8');
+const selectionEditPanelSource = await readFile(new URL('../src/ui/selection-edit-panel.ts', import.meta.url), 'utf8');
 const blitShaderSource = await readFile(new URL('../src/shaders/blit-shader.ts', import.meta.url), 'utf8');
 const renderSource = await readFile(new URL('../src/render.ts', import.meta.url), 'utf8');
 const cameraParametersPanelSource = await readFile(new URL('../src/ui/camera-parameters-panel.ts', import.meta.url), 'utf8');
@@ -146,6 +148,9 @@ const rtxLauncherSource = await readFile(new URL('./launch-rtx.ps1', import.meta
 const rtxWatcherSource = await readFile(new URL('./watch-rtx-lifecycle.ps1', import.meta.url), 'utf8');
 const macNodeLauncherSource = await readFile(new URL('./ensure-node-macos.zsh', import.meta.url), 'utf8');
 const serviceWorkerSource = await readFile(new URL('../src/sw.ts', import.meta.url), 'utf8');
+const calcHistogramSource = await readFile(new URL('../src/data-processor/calc-histogram.ts', import.meta.url), 'utf8');
+const dataProcessorSource = await readFile(new URL('../src/data-processor/index.ts', import.meta.url), 'utf8');
+const histogramUiSource = await readFile(new URL('../src/ui/histogram.ts', import.meta.url), 'utf8');
 const modelLoadSource = `${assetLoaderSource}\n${sequenceSource}`;
 assert.doesNotMatch(
     splatSerializeSource,
@@ -201,6 +206,26 @@ assert.match(
     serviceWorkerSource,
     /networkFirst[\s\S]*\/static\/locales\/[\s\S]*fetch\(event\.request, \{ cache: 'no-store' \}\)/,
     'updated localization files must not be hidden by an installed app cache'
+);
+assert.doesNotMatch(
+    selectionEditPanelSource,
+    /class:\s*['"][^'"]*\s+[^'"]*['"]/,
+    'PCUI class options with multiple classes must use an array so DOMTokenList does not throw during startup'
+);
+assert.match(
+    advancedEditOpsSource,
+    /updateTransformData\(splat\.splatData\)[\s\S]*updateColorData\(splat\.splatData\)/,
+    'advanced selection edits must update the PlayCanvas GPU resource through supported APIs'
+);
+assert.doesNotMatch(
+    advancedEditOpsSource,
+    /\.updateTransforms\(|\.updateColors\(/,
+    'advanced selection edits must not call removed GSplatResource methods'
+);
+assert.match(
+    selectionEditPanelSource,
+    /events\.fire\('select\.delete'\)[\s\S]*events\.fire\('select\.hide'\)[\s\S]*this\.events\.fire\('edit\.add', op\)/,
+    'selection edit controls must use the editor command and undo history events'
 );
 assert.match(
     macNodeLauncherSource,
@@ -273,9 +298,34 @@ assert.match(
     'the RTX launcher must bind its app window to the local server lifecycle'
 );
 assert.match(
+    rtxLauncherSource,
+    /function Test-SuperSplatServerProcess[\s\S]*CommandLine -replace '\\\\', '\/'[\s\S]*scripts\/start-local\.mjs/,
+    'the RTX launcher must recognize valid server commands with either Windows or POSIX path separators'
+);
+assert.match(
     rtxWatcherSource,
-    /MainWindowHandle[\s\S]*scripts\\start-local\.mjs[\s\S]*--port=3011[\s\S]*Stop-Process/,
+    /MainWindowHandle[\s\S]*CommandLine -replace '\\\\', '\/'[\s\S]*scripts\/start-local\.mjs[\s\S]*--port=3011[\s\S]*Stop-Process/,
     'the RTX lifecycle watcher must verify its window and server before cleanup'
+);
+assert.match(
+    calcHistogramSource,
+    /async selectByRange[\s\S]*await this\.run\(splat, mode, options\)[\s\S]*mask\[i\] = 255/,
+    'histogram range selection must build its mask from the verified value-map path'
+);
+assert.match(
+    dataProcessorSource,
+    /selectByRange[\s\S]*calcHistogramImpl\.selectByRange/,
+    'data processor range selection must not use the WebGPU-incompatible RGBA8 mask pass'
+);
+assert.match(
+    histogramUiSource,
+    /addEventListener\('mousedown'[\s\S]*addEventListener\('mousemove'[\s\S]*addEventListener\('mouseup'/,
+    'histogram selection must retain a mouse-event fallback for macOS and embedded WebViews'
+);
+assert.match(
+    histogramUiSource,
+    /addEventListener\('click'[\s\S]*this\.events\.fire\('select'/,
+    'histogram selection must support click-only activation without a pointer sequence'
 );
 
 console.log('Core logic checks passed');
