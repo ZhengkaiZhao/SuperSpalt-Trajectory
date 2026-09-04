@@ -271,11 +271,11 @@ class CameraParametersPanel extends Container {
         const trajectoryPreviewButton = new Button({ text: '预览轨迹' });
         const trajectoryImageSaveButton = new Button({
             id: 'trajectory-image-save',
-            text: '选择目录并保存 PNG'
+            text: '选择目录并保存 PNG + TXT'
         });
         const trajectoryImageStatus = new Label({
             id: 'trajectory-image-status',
-            text: '使用“PNG 输出尺寸”，按完成后的插值轨迹逐帧渲染'
+            text: '逐帧渲染 PNG，并同时保存 CSV/TXT 轨迹外参'
         });
         trajectoryImageActions.append(trajectoryPreviewButton);
         trajectoryImageActions.append(trajectoryImageSaveButton);
@@ -552,8 +552,8 @@ class CameraParametersPanel extends Container {
                     cancelled: boolean
                 };
                 trajectoryImageStatus.text = result.cancelled ?
-                    `已停止，${result.frameCount}/${result.requestedFrameCount} 张保存在 ${result.directoryName}` :
-                    `已保存 ${result.frameCount} 张 ${result.width} x ${result.height} PNG 到 ${result.directoryName}`;
+                    `已停止，${result.frameCount}/${result.requestedFrameCount} 张及 CSV/TXT 轨迹保存在 ${result.directoryName}` :
+                    `已保存 ${result.frameCount} 张 ${result.width} x ${result.height} PNG 及 CSV/TXT 轨迹到 ${result.directoryName}`;
             } catch (error) {
                 if (!(error instanceof DOMException && error.name === 'AbortError')) {
                     trajectoryImageStatus.text = `保存失败：${error instanceof Error ? error.message : error}`;

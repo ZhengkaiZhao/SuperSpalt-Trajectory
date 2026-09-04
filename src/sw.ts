@@ -3,7 +3,7 @@ import { version as appVersion } from '../package.json';
 // export default null
 declare let self: ServiceWorkerGlobalScope;
 
-const cacheName = `superSplat-v${appVersion}-trajectory-webgpu-16`;
+const cacheName = `superSplat-v${appVersion}-trajectory-webgpu-17`;
 
 const cacheUrls = [
     './',
@@ -54,12 +54,12 @@ self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
 
     const url = new URL(event.request.url);
-    const core = ['/', '/index.html', '/index.js', '/index.css', '/sw.js']
-    .some(path => url.pathname.endsWith(path));
+    const networkFirst = ['/', '/index.html', '/index.js', '/index.css', '/sw.js']
+    .some(path => url.pathname.endsWith(path)) || url.pathname.includes('/static/locales/');
 
-    // Core bundles are network-first so an old installed PWA cannot hide a new
-    // HUD or renderer build. Large immutable WASM/assets remain cache-first.
-    event.respondWith(core ?
+    // Core bundles and localization are network-first so an old installed PWA
+    // cannot hide a new UI build. Large immutable WASM/assets remain cache-first.
+    event.respondWith(networkFirst ?
         fetch(event.request, { cache: 'no-store' })
         .then((response) => {
             const copy = response.clone();

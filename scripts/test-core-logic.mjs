@@ -134,7 +134,10 @@ const sequenceSource = await readFile(new URL('../src/sequence.ts', import.meta.
 const splatSerializeSource = await readFile(new URL('../src/splat-serialize.ts', import.meta.url), 'utf8');
 const cameraSource = await readFile(new URL('../src/camera.ts', import.meta.url), 'utf8');
 const controllerSource = await readFile(new URL('../src/controllers.ts', import.meta.url), 'utf8');
+const editorSource = await readFile(new URL('../src/editor.ts', import.meta.url), 'utf8');
+const preferencesSource = await readFile(new URL('../src/preferences.ts', import.meta.url), 'utf8');
 const rightToolbarSource = await readFile(new URL('../src/ui/right-toolbar.ts', import.meta.url), 'utf8');
+const settingsPanelSource = await readFile(new URL('../src/ui/settings-panel.ts', import.meta.url), 'utf8');
 const blitShaderSource = await readFile(new URL('../src/shaders/blit-shader.ts', import.meta.url), 'utf8');
 const renderSource = await readFile(new URL('../src/render.ts', import.meta.url), 'utf8');
 const cameraParametersPanelSource = await readFile(new URL('../src/ui/camera-parameters-panel.ts', import.meta.url), 'utf8');
@@ -142,6 +145,7 @@ const imageSettingsDialogSource = await readFile(new URL('../src/ui/image-settin
 const rtxLauncherSource = await readFile(new URL('./launch-rtx.ps1', import.meta.url), 'utf8');
 const rtxWatcherSource = await readFile(new URL('./watch-rtx-lifecycle.ps1', import.meta.url), 'utf8');
 const macNodeLauncherSource = await readFile(new URL('./ensure-node-macos.zsh', import.meta.url), 'utf8');
+const serviceWorkerSource = await readFile(new URL('../src/sw.ts', import.meta.url), 'utf8');
 const modelLoadSource = `${assetLoaderSource}\n${sequenceSource}`;
 assert.doesNotMatch(
     splatSerializeSource,
@@ -172,6 +176,31 @@ assert.match(
     controllerSource,
     /const clearAllKeys = \(\) => \{[\s\S]*resetMouseState\(\);[\s\S]*touches = \[\]/,
     'camera input must clear pointer gestures when a macOS window loses focus'
+);
+assert.match(
+    controllerSource,
+    /camera\.flyMoveSpace === 'view'[\s\S]*worldTransform\.getZ\(\)[\s\S]*worldTransform\.getX\(\)[\s\S]*worldTransform\.getY\(\)/,
+    'view-relative fly movement must use all three current camera axes'
+);
+assert.match(
+    controllerSource,
+    /Preserve horizontal navigation on the fixed world plane[\s\S]*zAxis\.y = 0[\s\S]*xAxis\.y = 0[\s\S]*moveVec\.y \+= vertical/,
+    'world-relative fly movement must preserve the existing horizontal navigation mode'
+);
+assert.match(
+    `${editorSource}\n${preferencesSource}\n${settingsPanelSource}`,
+    /camera\.setFlyMoveSpace[\s\S]*camera\.flyMoveSpace[\s\S]*isEnum\(\['world', 'view'\]\)[\s\S]*fly-move-space\.world[\s\S]*fly-move-space\.view/,
+    'fly movement coordinate space must be selectable and persisted'
+);
+assert.match(
+    rightToolbarSource,
+    /right-toolbar-fly-move-space[\s\S]*camera\.setFlyMoveSpace[\s\S]*camera\.flyMoveSpace[\s\S]*aria-pressed/,
+    'fly movement coordinate space must have a visible synchronized toolbar toggle'
+);
+assert.match(
+    serviceWorkerSource,
+    /networkFirst[\s\S]*\/static\/locales\/[\s\S]*fetch\(event\.request, \{ cache: 'no-store' \}\)/,
+    'updated localization files must not be hidden by an installed app cache'
 );
 assert.match(
     macNodeLauncherSource,
@@ -232,6 +261,11 @@ assert.match(
     renderSource,
     /width > maxTextureSize \|\| height > maxTextureSize/,
     'image rendering must reject dimensions above the GPU texture limit'
+);
+assert.match(
+    renderSource,
+    /camera_poses_colmap_w2c\.csv[\s\S]*camera\.colmapW2cRowsToCsv[\s\S]*camera_poses_colmap_w2c\.txt[\s\S]*camera\.colmapW2cRowsToTxt/,
+    'trajectory image directories must include matching CSV and TXT pose files'
 );
 assert.match(
     rtxLauncherSource,

@@ -1281,6 +1281,9 @@ const registerCameraExportEvents = (scene: Scene, events: Events) => {
     events.function('camera.colmapW2cRowsToCsv', (poses: ColmapW2cPoseRow[]) => (
         colmapW2cRowsToCsv(poses)
     ));
+    events.function('camera.colmapW2cRowsToTxt', (poses: ColmapW2cPoseRow[]) => (
+        colmapW2cRowsToImagesText(poses)
+    ));
     events.function('camera.saveCurrentTrajectory', (format: CurrentTrajectoryExportFormat) => (
         saveCurrentTrajectoryExport(events, format, scene)
     ));

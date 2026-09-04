@@ -1,5 +1,6 @@
 import { Button, Container, Element, Label } from '@playcanvas/pcui';
 
+import type { FlyMoveSpace } from '../camera';
 import { Events } from '../events';
 import { ShortcutManager } from '../shortcut-manager';
 import { i18n } from './localization';
@@ -10,6 +11,8 @@ import cameraResetSvg from './svg/camera-reset.svg';
 import centersSvg from './svg/centers.svg';
 import colorPanelSvg from './svg/color-panel.svg';
 import flyCameraSvg from './svg/fly-camera.svg';
+import flyMoveViewSvg from './svg/fly-move-view.svg';
+import flyMoveWorldSvg from './svg/fly-move-world.svg';
 import orbitCameraSvg from './svg/orbit-camera.svg';
 import ringsSvg from './svg/rings.svg';
 import showHideSplatsSvg from './svg/show-hide-splats.svg';
@@ -50,6 +53,11 @@ class RightToolbar extends Container {
 
         const flyMode = new Button({
             id: 'right-toolbar-fly-mode',
+            class: 'right-toolbar-toggle'
+        });
+
+        const flyMoveSpaceToggle = new Button({
+            id: 'right-toolbar-fly-move-space',
             class: 'right-toolbar-toggle'
         });
 
@@ -94,6 +102,11 @@ class RightToolbar extends Container {
         showHideSplats.dom.appendChild(createSvg(showHideSplatsSvg));
         orbitMode.dom.appendChild(createSvg(orbitCameraSvg));
         flyMode.dom.appendChild(createSvg(flyCameraSvg));
+        const flyMoveWorldDom = createSvg(flyMoveWorldSvg);
+        const flyMoveViewDom = createSvg(flyMoveViewSvg);
+        flyMoveViewDom.style.display = 'none';
+        flyMoveSpaceToggle.dom.appendChild(flyMoveWorldDom);
+        flyMoveSpaceToggle.dom.appendChild(flyMoveViewDom);
         cameraFrameSelection.dom.appendChild(createSvg(cameraFrameSelectionSvg));
         cameraReset.dom.appendChild(createSvg(cameraResetSvg));
         cameraFront.dom.appendChild(createSvg(cameraFrontSvg));
@@ -105,6 +118,7 @@ class RightToolbar extends Container {
         this.append(new Element({ class: 'right-toolbar-separator' }));
         this.append(orbitMode);
         this.append(flyMode);
+        this.append(flyMoveSpaceToggle);
         this.append(new Element({ class: 'right-toolbar-separator' }));
         this.append(cameraFrameSelection);
         this.append(cameraReset);
@@ -131,6 +145,11 @@ class RightToolbar extends Container {
         tooltips.register(showHideSplats, tooltip('tooltip.right-toolbar.show-hide', 'camera.toggleOverlay'), 'left');
         tooltips.register(orbitMode, tooltip('tooltip.right-toolbar.orbit-camera', 'camera.toggleControlMode'), 'left');
         tooltips.register(flyMode, tooltip('tooltip.right-toolbar.fly-camera', 'camera.toggleControlMode'), 'left');
+        let flyMoveSpace: FlyMoveSpace = 'world';
+        const flyMoveSpaceText = () => `${i18n.t('panel.settings.fly-move-space')}: ${i18n.t(`panel.settings.fly-move-space.${flyMoveSpace}`)}`;
+        const updateFlyMoveSpaceLabel = () => flyMoveSpaceToggle.dom.setAttribute('aria-label', flyMoveSpaceText());
+        i18n.onChange(updateFlyMoveSpaceLabel, flyMoveSpaceToggle);
+        tooltips.register(flyMoveSpaceToggle, flyMoveSpaceText, 'left');
         tooltips.register(cameraFrameSelection, tooltip('tooltip.right-toolbar.frame-selection', 'camera.focus'), 'left');
         tooltips.register(cameraReset, tooltip('tooltip.right-toolbar.reset-camera', 'camera.reset'), 'left');
         tooltips.register(cameraFront, tooltip('tooltip.right-toolbar.front-camera'), 'left');
@@ -147,6 +166,9 @@ class RightToolbar extends Container {
         showHideSplats.on('click', () => events.fire('camera.toggleOverlay'));
         orbitMode.on('click', () => events.fire('camera.setControlMode', 'orbit'));
         flyMode.on('click', () => events.fire('camera.setControlMode', 'fly'));
+        flyMoveSpaceToggle.on('click', () => {
+            events.fire('camera.setFlyMoveSpace', flyMoveSpace === 'world' ? 'view' : 'world');
+        });
         cameraFrameSelection.on('click', () => events.fire('camera.focus'));
         cameraReset.on('click', () => events.fire('camera.reset'));
         cameraFront.on('click', () => events.fire('camera.front'));
@@ -167,6 +189,16 @@ class RightToolbar extends Container {
         events.on('camera.controlMode', (mode: 'orbit' | 'fly') => {
             orbitMode.class[mode === 'orbit' ? 'add' : 'remove']('active');
             flyMode.class[mode === 'fly' ? 'add' : 'remove']('active');
+        });
+
+        events.on('camera.flyMoveSpace', (value: FlyMoveSpace) => {
+            flyMoveSpace = value;
+            const viewRelative = value === 'view';
+            flyMoveSpaceToggle.class[viewRelative ? 'add' : 'remove']('active');
+            flyMoveSpaceToggle.dom.setAttribute('aria-pressed', String(viewRelative));
+            updateFlyMoveSpaceLabel();
+            flyMoveWorldDom.style.display = viewRelative ? 'none' : 'block';
+            flyMoveViewDom.style.display = viewRelative ? 'block' : 'none';
         });
 
         events.on('trajectoryPlanner.visible', (visible: boolean) => {

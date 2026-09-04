@@ -448,6 +448,49 @@ const verifyInAppTrajectoryExport = async (client) => evaluate(client, `(async (
     return { result, manifestFrames: manifest.rendered_frame_count, images };
 })()`);
 
+const verifyFlyMovementSpace = async (client) => evaluate(client, `(async () => {
+    const scene = window.scene;
+    const events = scene.events;
+    const camera = scene.camera;
+    const original = {
+        focalPoint: camera.focalPoint.toArray(),
+        azim: camera.azim,
+        elevation: camera.elevation,
+        moveSpace: camera.flyMoveSpace,
+        controlMode: camera.controlMode,
+        flySpeed: camera.flySpeed
+    };
+
+    const sample = (moveSpace) => {
+        const start = camera.focalPoint;
+        start.set(0, 0, 0);
+        camera.setFocalPoint(start, 0);
+        camera.setAzimElev(0, -45, 0);
+        camera.onUpdate(0);
+        events.fire('camera.setFlyMoveSpace', moveSpace);
+        events.fire('camera.fly.forward', true);
+        camera.onUpdate(1);
+        events.fire('camera.fly.forward', false);
+        return camera.focalPoint.toArray();
+    };
+
+    events.fire('camera.setControlMode', 'fly');
+    events.fire('camera.setFlySpeed', 1);
+    const world = sample('world');
+    const view = sample('view');
+
+    const restoredFocalPoint = camera.focalPoint;
+    restoredFocalPoint.set(...original.focalPoint);
+    camera.setFocalPoint(restoredFocalPoint, 0);
+    camera.setAzimElev(original.azim, original.elevation, 0);
+    events.fire('camera.setFlySpeed', original.flySpeed);
+    events.fire('camera.setFlyMoveSpace', original.moveSpace);
+    events.fire('camera.setControlMode', original.controlMode);
+    camera.onUpdate(0);
+
+    return { world, view };
+})()`);
+
 const verifyColmapW2cTrajectory = async (client) => evaluate(client, `(async () => {
     const scene = window.scene;
     const events = scene.events;
@@ -479,6 +522,7 @@ const verifyColmapW2cTrajectory = async (client) => evaluate(client, `(async () 
     const trajectory = events.invoke('recordedView.targetPoses');
     const exported = events.invoke('camera.buildCurrentTrajectory');
     const csv = events.invoke('camera.buildCurrentTrajectoryCsv');
+    const txt = events.invoke('camera.buildCurrentTrajectoryTxt');
 
     const root = await navigator.storage.getDirectory();
     const renderResult = await events.invoke('render.trajectoryImages', {
@@ -490,6 +534,10 @@ const verifyColmapW2cTrajectory = async (client) => evaluate(client, `(async () 
     const directory = await root.getDirectoryHandle(renderResult.directoryName);
     const poseFile = await (await directory.getFileHandle('camera_poses_colmap_w2c.csv')).getFile();
     const renderedCsv = await poseFile.text();
+    const poseTxtFile = await (await directory.getFileHandle('camera_poses_colmap_w2c.txt')).getFile();
+    const renderedTxt = await poseTxtFile.text();
+    const manifestFile = await (await directory.getFileHandle('render_manifest.json')).getFile();
+    const manifest = JSON.parse(await manifestFile.text());
     const renderedImages = [];
     for (const row of exported.poses) {
         const file = await (await directory.getFileHandle(row.image_name)).getFile();
@@ -581,7 +629,10 @@ const verifyColmapW2cTrajectory = async (client) => evaluate(client, `(async () 
     return {
         exported,
         csv,
+        txt,
         renderedCsv,
+        renderedTxt,
+        manifest,
         renderResult,
         maxPositionError,
         maxForwardError,
@@ -826,6 +877,15 @@ const main = async () => {
         const poses = buildPoses(cameras, model.matrix);
         console.log(`Model world transform: ${JSON.stringify(model.matrix)}`);
         console.log(`First render pose: ${JSON.stringify({ position: poses[0].position, rotation: poses[0].rotation, fov: poses[0].fov })}`);
+        if (args['verify-fly-movement'] !== undefined) {
+            const verification = await verifyFlyMovementSpace(client);
+            const valid = Math.abs(verification.world[1]) < 1e-6 &&
+                Math.abs(verification.view[1]) > 0.5 &&
+                Math.abs(Math.hypot(...verification.world) - 1) < 1e-6 &&
+                Math.abs(Math.hypot(...verification.view) - 1) < 1e-6;
+            if (!valid) throw new Error(`Fly movement space verification failed: ${JSON.stringify(verification)}`);
+            console.log(`Verified fly movement spaces: ${JSON.stringify(verification)}`);
+        }
         if (args['verify-real-dataset'] !== undefined) {
             const verification = await verifyRealCameraDataset(client, realCameraFixture);
             const expected = realCameraFixture.imageNames.length;
@@ -966,6 +1026,12 @@ const main = async () => {
             const valid = verification.exported.pose_count === 5 &&
                 verification.csv.trimStart().startsWith(expectedHeader) &&
                 verification.renderedCsv === verification.csv &&
+                verification.renderedTxt === verification.txt &&
+                verification.renderedTxt.includes('# Number of images: 5, mean observations per image: 0') &&
+                verification.manifest.colmap_w2c_pose_file === 'camera_poses_colmap_w2c.csv' &&
+                verification.manifest.colmap_w2c_pose_files?.csv === 'camera_poses_colmap_w2c.csv' &&
+                verification.manifest.colmap_w2c_pose_files?.txt === 'camera_poses_colmap_w2c.txt' &&
+                verification.exported.poses.every(row => verification.renderedTxt.includes(` 1 ${row.image_name}\n`)) &&
                 verification.renderResult.frameCount === 5 &&
                 verification.maxPositionError < 1e-4 && verification.maxForwardError < 1e-4 &&
                 verification.pixelMeanAbsoluteError < 0.5 &&
@@ -984,6 +1050,7 @@ const main = async () => {
                 })}`);
             }
             await writeFile(path.join(outputDirectory, 'camera_poses_colmap_w2c.csv'), verification.csv);
+            await writeFile(path.join(outputDirectory, 'camera_poses_colmap_w2c.txt'), verification.txt);
             await writeFile(path.join(outputDirectory, 'colmap_w2c_validation.json'), `${JSON.stringify({
                 pose_count: verification.exported.pose_count,
                 source_type: verification.exported.source_type,
@@ -994,6 +1061,7 @@ const main = async () => {
                 horizontal_asymmetry: verification.horizontalAsymmetry,
                 vertical_asymmetry: verification.verticalAsymmetry,
                 png_pose_csv_matches_standalone_csv: verification.renderedCsv === verification.csv,
+                png_pose_txt_matches_standalone_txt: verification.renderedTxt === verification.txt,
                 images: verification.renderedImages.map(image => image.name)
             }, null, 2)}\n`);
             await Promise.all(verification.renderedImages.map(image => writeFile(

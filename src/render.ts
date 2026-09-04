@@ -655,6 +655,12 @@ const registerRenderEvents = (scene: Scene, events: Events) => {
             await poseStream.write(events.invoke('camera.colmapW2cRowsToCsv', colmapW2cRows) as string);
             await poseStream.close();
 
+            const poseTxtFilename = 'camera_poses_colmap_w2c.txt';
+            const poseTxtHandle = await outputDirectory.getFileHandle(poseTxtFilename, { create: true });
+            const poseTxtStream = await poseTxtHandle.createWritable();
+            await poseTxtStream.write(events.invoke('camera.colmapW2cRowsToTxt', colmapW2cRows) as string);
+            await poseTxtStream.close();
+
             const manifest = {
                 schema: 'supersplat.trajectory-images.v1',
                 scene: baseFilename(),
@@ -666,6 +672,10 @@ const registerRenderEvents = (scene: Scene, events: Events) => {
                 cancelled,
                 images: imageNames,
                 colmap_w2c_pose_file: poseFilename,
+                colmap_w2c_pose_files: {
+                    csv: poseFilename,
+                    txt: poseTxtFilename
+                },
                 colmap_w2c_convention: 'X_camera = R_w2c * X_world + t_w2c; quaternion order w,x,y,z',
                 pixel_convention: {
                     origin: 'top-left',

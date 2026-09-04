@@ -453,25 +453,34 @@ class PointerController {
 
                 moveVec.set(0, 0, 0);
 
-                // Forward/backward along horizontal forward direction (fixed Y)
-                if (forward) {
-                    const zAxis = worldTransform.getZ();
-                    zAxis.y = 0;
-                    zAxis.normalize();
-                    moveVec.add(zAxis.mulScalar(-forward * factor));
-                }
-
-                // Strafe left/right (horizontal)
-                if (strafe) {
-                    const xAxis = worldTransform.getX();
-                    xAxis.y = 0;
-                    xAxis.normalize();
-                    moveVec.add(xAxis.mulScalar(strafe * factor));
-                }
-
-                // Up/down in world space
-                if (vertical) {
-                    moveVec.y += vertical * factor;
+                if (camera.flyMoveSpace === 'view') {
+                    // Move on the camera's local axes, including its current pitch.
+                    if (forward) {
+                        moveVec.add(worldTransform.getZ().normalize().mulScalar(-forward * factor));
+                    }
+                    if (strafe) {
+                        moveVec.add(worldTransform.getX().normalize().mulScalar(strafe * factor));
+                    }
+                    if (vertical) {
+                        moveVec.add(worldTransform.getY().normalize().mulScalar(vertical * factor));
+                    }
+                } else {
+                    // Preserve horizontal navigation on the fixed world plane.
+                    if (forward) {
+                        const zAxis = worldTransform.getZ();
+                        zAxis.y = 0;
+                        zAxis.normalize();
+                        moveVec.add(zAxis.mulScalar(-forward * factor));
+                    }
+                    if (strafe) {
+                        const xAxis = worldTransform.getX();
+                        xAxis.y = 0;
+                        xAxis.normalize();
+                        moveVec.add(xAxis.mulScalar(strafe * factor));
+                    }
+                    if (vertical) {
+                        moveVec.y += vertical * factor;
+                    }
                 }
 
                 // Move the focal point (camera follows due to orbit calculation)

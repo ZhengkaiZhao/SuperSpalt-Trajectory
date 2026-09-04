@@ -1,6 +1,7 @@
 import { MemoryFileSystem } from '@playcanvas/splat-transform';
 import { Color, Mat4, path, Quat, Texture, Vec3, Vec4 } from 'playcanvas';
 
+import type { FlyMoveSpace } from './camera';
 import { EditHistory } from './edit-history';
 import { SelectAllOp, SelectNoneOp, SelectInvertOp, SelectOp, HideSelectionOp, UnhideAllOp, DeleteSelectionOp, ResetOp, MultiOp, AddSplatOp, SetLocalFrameOp } from './edit-ops';
 import { Element, ElementType } from './element';
@@ -865,6 +866,23 @@ const registerEditorEvents = (events: Events, editHistory: EditHistory, scene: S
 
     events.on('camera.setFlySpeed', (value: number) => {
         setFlySpeed(value);
+    });
+
+    // camera fly movement coordinate space
+
+    const setFlyMoveSpace = (value: FlyMoveSpace) => {
+        if (value !== scene.camera.flyMoveSpace) {
+            scene.camera.flyMoveSpace = value;
+            events.fire('camera.flyMoveSpace', value);
+        }
+    };
+
+    events.function('camera.flyMoveSpace', () => {
+        return scene.camera.flyMoveSpace;
+    });
+
+    events.on('camera.setFlyMoveSpace', (value: FlyMoveSpace) => {
+        setFlyMoveSpace(value);
     });
 
     // outline selection

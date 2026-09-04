@@ -1,6 +1,7 @@
 import { BooleanInput, Button, ColorPicker, Container, Label, SelectInput, SliderInput } from '@playcanvas/pcui';
 import { Color } from 'playcanvas';
 
+import type { FlyMoveSpace } from '../camera';
 import { Events } from '../events';
 import type { GridPlane } from '../infinite-grid';
 import { ShortcutManager } from '../shortcut-manager';
@@ -253,6 +254,29 @@ class SettingsPanel extends Container {
         cameraFlySpeedRow.append(cameraFlySpeedLabel);
         cameraFlySpeedRow.append(cameraFlySpeedSlider);
 
+        // camera fly movement coordinate space
+
+        const cameraFlyMoveSpaceRow = new Container({
+            class: 'settings-panel-row'
+        });
+
+        const cameraFlyMoveSpaceLabel = new Label({
+            class: 'settings-panel-row-label'
+        });
+        i18n.bindText(cameraFlyMoveSpaceLabel, 'panel.settings.fly-move-space');
+
+        const cameraFlyMoveSpaceSelection = new SelectInput({
+            class: 'settings-panel-row-select',
+            defaultValue: 'world'
+        });
+        i18n.bindOptions(cameraFlyMoveSpaceSelection, () => [
+            { v: 'world', t: i18n.t('panel.settings.fly-move-space.world') },
+            { v: 'view', t: i18n.t('panel.settings.fly-move-space.view') }
+        ]);
+
+        cameraFlyMoveSpaceRow.append(cameraFlyMoveSpaceLabel);
+        cameraFlyMoveSpaceRow.append(cameraFlyMoveSpaceSelection);
+
         // centers size
 
         const centersSizeRow = new Container({
@@ -459,6 +483,7 @@ class SettingsPanel extends Container {
         this.append(fovDollyRow);
         this.append(shBandsRow);
         this.append(cameraFlySpeedRow);
+        this.append(cameraFlyMoveSpaceRow);
         this.append(centersSizeRow);
         this.append(centersColorRow);
         this.append(outlineSelectionRow);
@@ -536,6 +561,16 @@ class SettingsPanel extends Container {
 
         cameraFlySpeedSlider.on('change', (value: number) => {
             events.fire('camera.setFlySpeed', value);
+        });
+
+        // camera fly movement coordinate space
+
+        events.on('camera.flyMoveSpace', (value: FlyMoveSpace) => {
+            cameraFlyMoveSpaceSelection.value = value;
+        });
+
+        cameraFlyMoveSpaceSelection.on('change', (value: FlyMoveSpace) => {
+            events.fire('camera.setFlyMoveSpace', value);
         });
 
         // fov auto dolly

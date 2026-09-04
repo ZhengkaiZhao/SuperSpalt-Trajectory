@@ -53,6 +53,8 @@ const v4 = new Vec4();
 // modulo dealing with negative numbers
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 
+type FlyMoveSpace = 'world' | 'view';
+
 class Camera extends Element {
     /**
      * Calculate the forward vector given azimuth and elevation angles.
@@ -82,6 +84,8 @@ class Camera extends Element {
     sceneRadius = 1;
 
     flySpeed = 1;
+
+    flyMoveSpace: FlyMoveSpace = 'world';
 
     controlMode: 'orbit' | 'fly' = 'orbit';
 
@@ -840,3 +844,4 @@ class Camera extends Element {
 }
 
 export { Camera };
+export type { FlyMoveSpace };
